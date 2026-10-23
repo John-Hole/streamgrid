@@ -23,3 +23,6 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+# Local tooling artifacts
+.playwright-mcp/
