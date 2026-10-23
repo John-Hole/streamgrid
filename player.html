@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid | Player</title>
     <meta name="referrer" content="no-referrer">
-    <link rel="stylesheet" href="index.css?v=16">
+    <link rel="stylesheet" href="index.css?v=17">
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -53,10 +53,9 @@
             {"id": 3, "name": "Canale UNO ✨", "streams": ["130", "170"]}
         ];
         const normalChannels = [
-            {"id": 99, "name": "Canale di lavoro 🧪", "urls": ["/api/player?channel=SkySportCalcioIT", "https://wideiptv.top/player/SkySportCalcioIT"]},
             {"id": 4, "name": "Canale D 📍", "urls": ["/api/player?channel=zonaDAZN", "https://wideiptv.top/player/zonaDAZN"]},
             {"id": 5, "name": "Canale C ⚽️", "urls": ["/api/player?channel=SkySportCalcioIT", "https://wideiptv.top/player/SkySportCalcioIT"]},
-            {"id": 6, "name": "Canale Uno ✨", "urls": ["/api/player?channel=SkySportUnoIT", "https://wideiptv.top/player/SkySportUnoIT"]},
+            {"id": 6, "name": "Canale Uno ✨", "urls": ["/api/player?channel=SkySportUnoIT", "https://wideiptv.top/player/SkySportUnoIT", "https://gomstream.xyz/live/stream-461.php"]},
             {"id": 7, "name": "Canale T 🥎", "urls": ["/api/player?channel=SkySportTennisIT", "https://wideiptv.top/player/SkySportTennisIT"]},
             {"id": 8, "name": "Canale 24 📰", "urls": ["/api/player?channel=SkySport24IT", "https://wideiptv.top/player/SkySport24IT"]},
             {"id": 9, "name": "Canale E1 🥇", "urls": ["/api/player?channel=euro1it", "https://wideiptv.top/player/euro1it"]},
@@ -121,8 +120,14 @@
 
             const selector = document.getElementById('modal-stream-selector');
             if (streamUrls.length > 1) {
+                const titles = streamUrls.map((u, i) => {
+                    if (u.startsWith('/api/')) return `Fonte ${i + 1} (Clean)`;
+                    if (u.includes('wideiptv')) return `Fonte ${i + 1} (Originale)`;
+                    if (u.includes('gomstream')) return `Fonte ${i + 1} (Gomstream)`;
+                    return `Fonte ${i + 1}`;
+                });
                 selector.style.display = 'flex';
-                selector.innerHTML = streamUrls.map((_, i) => `<button onclick='updateNormalStream(${JSON.stringify(channel)}, ${i})' class="selector-btn ${i === index ? 'active' : ''}" title="${i === 0 ? 'Player 1 (Clean)' : 'Player 2 (Originale)'}">${i + 1}</button>`).join('');
+                selector.innerHTML = streamUrls.map((_, i) => `<button onclick='updateNormalStream(${JSON.stringify(channel)}, ${i})' class="selector-btn ${i === index ? 'active' : ''}" title="${titles[i]}">${i + 1}</button>`).join('');
             } else {
                 selector.style.display = 'none';
             }

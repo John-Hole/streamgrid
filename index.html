@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid</title>
-    <link rel="stylesheet" href="index.css?v=16">
+    <link rel="stylesheet" href="index.css?v=17">
     <meta name="description" content="Piattaforma di streaming per canali TV sportivi e d'intrattenimento.">
     
     <!-- PWA Settings -->
@@ -92,10 +92,10 @@
         ];
 
         const normalChannels = [
-            {"id": 99, "name": "Canale di lavoro 🧪", "urls": ["/api/player?channel=SkySportCalcioIT", "https://wideiptv.top/player/SkySportCalcioIT"], "badge": "TEST", "isTest": true},
+            {"id": 99, "name": "Multiview 🧪", "href": "multiview.html", "badge": "TEST", "isTest": true},
             {"id": 4, "name": "Canale D 📍", "urls": ["/api/player?channel=zonaDAZN", "https://wideiptv.top/player/zonaDAZN"]},
             {"id": 5, "name": "Canale C ⚽️", "urls": ["/api/player?channel=SkySportCalcioIT", "https://wideiptv.top/player/SkySportCalcioIT"]},
-            {"id": 6, "name": "Canale Uno ✨", "urls": ["/api/player?channel=SkySportUnoIT", "https://wideiptv.top/player/SkySportUnoIT"]},
+            {"id": 6, "name": "Canale Uno ✨", "urls": ["/api/player?channel=SkySportUnoIT", "https://wideiptv.top/player/SkySportUnoIT", "https://gomstream.xyz/live/stream-461.php"]},
             {"id": 7, "name": "Canale T 🥎", "urls": ["/api/player?channel=SkySportTennisIT", "https://wideiptv.top/player/SkySportTennisIT"]},
             {"id": 8, "name": "Canale 24 📰", "urls": ["/api/player?channel=SkySport24IT", "https://wideiptv.top/player/SkySport24IT"]},
             {"id": 9, "name": "Canale E1 🥇", "urls": ["/api/player?channel=euro1it", "https://wideiptv.top/player/euro1it"]},
@@ -136,8 +136,9 @@
             `).join('');
 
             normalGrid.innerHTML = normalChannels.map(ch => `
-                <div class="channel-card fade-in ${ch.isTest ? 'test-card' : ''}" onclick="window.location.href='player.html?v=6&type=normal&id=${ch.id}'">
+                <div class="channel-card fade-in ${ch.isTest ? 'test-card' : ''}" onclick="window.location.href='${ch.href || `player.html?v=6&type=normal&id=${ch.id}`}'">
                     <div class="channel-name">${ch.name}${ch.badge ? `<span class="badge-test">${ch.badge}</span>` : ''}</div>
+                    ${ch.href ? '<div class="channel-type">10 pagine · 999 stream · preview live</div>' : ''}
                 </div>
             `).join('');
 

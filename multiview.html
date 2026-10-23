@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Grid | Multiview</title>
+    <link rel="stylesheet" href="index.css?v=17">
+
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="stream-in-colorado.jpg">
+</head>
+<body class="mv-body">
+    <header class="mv-header glass">
+        <button onclick="window.location.href='index.html'" class="back-btn" title="Torna indietro">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+
+        <div class="mv-heading">
+            <span class="mv-title">Multiview 🧪</span>
+            <span class="mv-sub" id="mv-range">1 – 100</span>
+        </div>
+
+        <nav class="mv-pages" id="mv-pages" aria-label="Pagine"></nav>
+
+        <div class="mv-stats glass" id="mv-stats">0 / 10 live</div>
+    </header>
+
+    <main class="mv-grid" id="mv-grid"></main>
+
+    <div class="mv-hint" id="mv-hint">Clicca un'anteprima per aprirla a tutto schermo · <b>Esc</b> per uscire</div>
+
+    <script>
+        // ============================================================
+        //  MULTIVIEW - 999 stream divisi in 10 pagine da 100
+        //  Massimo 10 preview in diretta contemporaneamente:
+        //  le altre si caricano man mano che si scorre.
+        // ============================================================
+        const TOTAL = 999;
+        const PER_PAGE = 100;
+        const PAGE_COUNT = Math.ceil(TOTAL / PER_PAGE); // 10
+        const MAX_LIVE = 10;
+        const BASE_URL = 'https://gomstream.xyz/live/stream-';
+
+        const grid = document.getElementById('mv-grid');
+        const pagesNav = document.getElementById('mv-pages');
+        const rangeEl = document.getElementById('mv-range');
+        const statsEl = document.getElementById('mv-stats');
+        const hintEl = document.getElementById('mv-hint');
+
+        // Stato
+        let page = 1;
+        let observer = null;
+        const visible = new Map();   // tile -> ratio di visibilita'
+        const liveTiles = new Set(); // tile con iframe montato
+        const unmountTimers = new Map();
+
+        // --- Utility -------------------------------------------------
+        function streamUrl(n) {
+            return `${BASE_URL}${n}.php`;
+        }
+
+        function pageRange(p) {
+            const start = (p - 1) * PER_PAGE + 1;
+            const end = Math.min(p * PER_PAGE, TOTAL);
+            return [start, end];
+        }
+
+        function clampPage(p) {
+            if (!p || isNaN(p)) return 1;
+            return Math.min(Math.max(parseInt(p, 10), 1), PAGE_COUNT);
+        }
+
+        function readParams() {
+            const params = new URLSearchParams(window.location.search);
+            page = clampPage(params.get('p'));
+        }
+
+        function writeParams() {
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('p', page);
+                history.replaceState(null, '', url.toString());
+            } catch (e) { /* file:// fallback */ }
+        }
+
+        // --- Paginazione ---------------------------------------------
+        function buildPages() {
+            pagesNav.innerHTML = '';
+
+            const prev = document.createElement('button');
+            prev.className = 'mv-page mv-arrow';
+            prev.type = 'button';
+            prev.innerHTML = '&lsaquo;';
+            prev.title = 'Pagina precedente';
+            prev.disabled = page <= 1;
+            prev.addEventListener('click', () => goToPage(page - 1));
+            pagesNav.appendChild(prev);
+
+            for (let p = 1; p <= PAGE_COUNT; p++) {
+                const [s, e] = pageRange(p);
+                const btn = document.createElement('button');
+                btn.className = 'mv-page' + (p === page ? ' active' : '');
+                btn.type = 'button';
+                btn.textContent = p;
+                btn.title = `Stream ${s} – ${e}`;
+                btn.addEventListener('click', () => goToPage(p));
+                pagesNav.appendChild(btn);
+            }
+
+            const next = document.createElement('button');
+            next.className = 'mv-page mv-arrow';
+            next.type = 'button';
+            next.innerHTML = '&rsaquo;';
+            next.title = 'Pagina successiva';
+            next.disabled = page >= PAGE_COUNT;
+            next.addEventListener('click', () => goToPage(page + 1));
+            pagesNav.appendChild(next);
+        }
+
+        function goToPage(p) {
+            p = clampPage(p);
+            if (p === page) return;
+            page = p;
+            writeParams();
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // --- Montaggio / smontaggio iframe ---------------------------
+        function mount(tile) {
+            cancelUnmount(tile);
+            if (tile.querySelector('iframe')) return;
+
+            const n = tile.dataset.n;
+            const frame = document.createElement('iframe');
+            frame.className = 'mv-frame';
+            frame.src = streamUrl(n);
+            frame.title = `Stream ${n}`;
+            frame.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
+            frame.setAttribute('allowfullscreen', '');
+            frame.addEventListener('load', () => tile.classList.add('loaded'));
+            tile.appendChild(frame);
+            liveTiles.add(tile);
+            updateStats();
+        }
+
+        function cancelUnmount(tile) {
+            const t = unmountTimers.get(tile);
+            if (t) {
+                clearTimeout(t);
+                unmountTimers.delete(tile);
+            }
+        }
+
+        function unmount(tile) {
+            cancelUnmount(tile);
+            if (document.fullscreenElement === tile) return;
+            const frame = tile.querySelector('iframe');
+            if (frame) frame.remove();
+            tile.classList.remove('loaded');
+            liveTiles.delete(tile);
+            updateStats();
+        }
+
+        function scheduleUnmount(tile) {
+            if (!tile.querySelector('iframe') || unmountTimers.has(tile)) return;
+            const t = setTimeout(() => {
+                unmountTimers.delete(tile);
+                unmount(tile);
+            }, 1500);
+            unmountTimers.set(tile, t);
+        }
+
+        // tiene in diretta solo le MAX_LIVE anteprime piu' visibili
+        function syncLive() {
+            const fsTile = document.fullscreenElement;
+            const candidates = [];
+            visible.forEach((ratio, tile) => {
+                if (!tile.isConnected) return;
+                if (tile.querySelector('iframe')) liveTiles.add(tile);
+                candidates.push([tile, ratio]);
+            });
+
+            candidates.sort((a, b) => {
+                if (b[1] !== a[1]) return b[1] - a[1];
+                return parseInt(a[0].dataset.n, 10) - parseInt(b[0].dataset.n, 10);
+            });
+
+            const keep = new Set(candidates.slice(0, MAX_LIVE).map(c => c[0]));
+            if (fsTile && fsTile.classList.contains('mv-tile')) keep.add(fsTile);
+
+            keep.forEach(tile => mount(tile));
+            liveTiles.forEach(tile => {
+                if (!keep.has(tile)) scheduleUnmount(tile);
+            });
+            updateStats();
+        }
+
+        // --- Ricerca ---------------------------------------------------
+        function createTile(n) {
+            const tile = document.createElement('div');
+            tile.className = 'mv-tile fade-in';
+            tile.dataset.n = n;
+            tile.innerHTML = `
+                <div class="mv-ph">
+                    <span class="mv-num">#${n}</span>
+                    <span class="mv-live"><i></i>LIVE</span>
+                </div>
+                <div class="mv-overlay" title="Apri a tutto schermo">
+                    <span class="mv-ov-num">#${n}</span>
+                    <span class="mv-ov-ico">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                    </span>
+                </div>
+                <button class="mv-exit" type="button" title="Esci da tutto schermo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>`;
+
+            tile.querySelector('.mv-overlay').addEventListener('click', ev => {
+                ev.stopPropagation();
+                goFullscreen(tile);
+            });
+            tile.querySelector('.mv-exit').addEventListener('click', ev => {
+                ev.stopPropagation();
+                exitFullscreen();
+            });
+
+            return tile;
+        }
+
+        function render() {
+            const [start, end] = pageRange(page);
+            rangeEl.textContent = `${start} – ${end}`;
+
+            // ripulizia
+            if (observer) observer.disconnect();
+            unmountTimers.forEach(t => clearTimeout(t));
+            unmountTimers.clear();
+            visible.clear();
+            liveTiles.forEach(t => t.classList.remove('loaded'));
+            liveTiles.clear();
+            grid.innerHTML = '';
+
+            const frag = document.createDocumentFragment();
+            for (let n = start; n <= end; n++) frag.appendChild(createTile(n));
+            grid.appendChild(frag);
+
+            observer = new IntersectionObserver(onIntersect, {
+                root: null,
+                rootMargin: '120px 0px',
+                threshold: [0, 0.25, 0.5, 0.75, 1]
+            });
+            grid.querySelectorAll('.mv-tile').forEach(t => observer.observe(t));
+
+            buildPages();
+            updateStats();
+        }
+
+        function onIntersect(entries) {
+            entries.forEach(en => {
+                if (en.isIntersecting) {
+                    visible.set(en.target, en.intersectionRatio || 0.01);
+                } else {
+                    visible.delete(en.target);
+                }
+            });
+            syncLive();
+        }
+
+        function updateStats() {
+            statsEl.textContent = `${liveTiles.size} / ${MAX_LIVE} live`;
+        }
+
+        // --- Fullscreen ----------------------------------------------
+        function hideHint() {
+            if (hintEl) hintEl.classList.add('mv-hint-fade');
+        }
+
+        function goFullscreen(tile) {
+            hideHint();
+            const req = tile.requestFullscreen || tile.webkitRequestFullscreen;
+            if (req) {
+                try {
+                    const res = req.call(tile);
+                    if (res && typeof res.catch === 'function') res.catch(() => fallbackFullscreen(tile));
+                    return;
+                } catch (e) {
+                    fallbackFullscreen(tile);
+                    return;
+                }
+            }
+            fallbackFullscreen(tile);
+        }
+
+        function fallbackFullscreen(tile) {
+            tile.classList.add('fs-fixed');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function exitFullscreen() {
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+            document.querySelectorAll('.mv-tile.fs-fixed').forEach(t => t.classList.remove('fs-fixed'));
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                document.querySelectorAll('.mv-tile.fs-fixed').forEach(t => t.classList.remove('fs-fixed'));
+                document.body.style.overflow = '';
+            }
+            syncLive();
+        });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!document.webkitFullscreenElement) {
+                document.querySelectorAll('.mv-tile.fs-fixed').forEach(t => t.classList.remove('fs-fixed'));
+                document.body.style.overflow = '';
+            }
+            syncLive();
+        });
+
+        // Tastiera: Esc per uscire da tutto schermo
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') exitFullscreen();
+        });
+
+        // --- Init -----------------------------------------------------
+        readParams();
+        writeParams();
+        render();
+
+        // nasconde il suggerimento se non viene usato
+        setTimeout(hideHint, 20000);
+    </script>
+</body>
+</html>
