@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid</title>
-    <link rel="stylesheet" href="index.css?v=17">
+    <link rel="stylesheet" href="index.css?v=18">
     <meta name="description" content="Piattaforma di streaming per canali TV sportivi e d'intrattenimento.">
     
     <!-- PWA Settings -->
@@ -138,7 +138,7 @@
             normalGrid.innerHTML = normalChannels.map(ch => `
                 <div class="channel-card fade-in ${ch.isTest ? 'test-card' : ''}" onclick="window.location.href='${ch.href || `player.html?v=6&type=normal&id=${ch.id}`}'">
                     <div class="channel-name">${ch.name}${ch.badge ? `<span class="badge-test">${ch.badge}</span>` : ''}</div>
-                    ${ch.href ? '<div class="channel-type">10 pagine · 999 stream · preview live</div>' : ''}
+                    ${ch.href ? '<div class="channel-type">100 pagine · 999 stream · preview live</div>' : ''}
                 </div>
             `).join('');
 

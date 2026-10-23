@@ -431,6 +431,14 @@ body.mv-body {
     line-height: 1;
 }
 
+/* Puntini di salto nella paginazione (100 pagine: si mostra solo un raggio) */
+.mv-page.mv-dots {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
+    pointer-events: none;
+}
+
 .mv-stats {
     display: flex;
     align-items: center;

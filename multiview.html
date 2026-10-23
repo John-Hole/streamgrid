@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid | Multiview</title>
-    <link rel="stylesheet" href="index.css?v=17">
+    <link rel="stylesheet" href="index.css?v=18">
 
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -35,13 +35,13 @@
 
     <script>
         // ============================================================
-        //  MULTIVIEW - 999 stream divisi in 10 pagine da 100
+        //  MULTIVIEW - 999 stream divisi in 100 pagine da 10
         //  Massimo 10 preview in diretta contemporaneamente:
         //  le altre si caricano man mano che si scorre.
         // ============================================================
         const TOTAL = 999;
-        const PER_PAGE = 100;
-        const PAGE_COUNT = Math.ceil(TOTAL / PER_PAGE); // 10
+        const PER_PAGE = 10;
+        const PAGE_COUNT = Math.ceil(TOTAL / PER_PAGE); // 100
         const MAX_LIVE = 10;
         const BASE_URL = 'https://gomstream.xyz/live/stream-';
 
@@ -100,7 +100,24 @@
             prev.addEventListener('click', () => goToPage(page - 1));
             pagesNav.appendChild(prev);
 
-            for (let p = 1; p <= PAGE_COUNT; p++) {
+            // Con 100 pagine non entrano tutti i numeri in header:
+            // si mostrano prima, ultima e corrente ±2, con i puntini di salto.
+            const items = [1, PAGE_COUNT];
+            for (let p = page - 2; p <= page + 2; p++) {
+                if (p >= 1 && p <= PAGE_COUNT) items.push(p);
+            }
+            const unique = [...new Set(items)].sort((a, b) => a - b);
+
+            let last = 0;
+            unique.forEach(p => {
+                if (p - last > 1) {
+                    const dots = document.createElement('span');
+                    dots.className = 'mv-page mv-dots';
+                    dots.textContent = '…';
+                    dots.title = `Stream ${last + 1} – ${p - 1}`;
+                    pagesNav.appendChild(dots);
+                }
+
                 const [s, e] = pageRange(p);
                 const btn = document.createElement('button');
                 btn.className = 'mv-page' + (p === page ? ' active' : '');
@@ -109,7 +126,8 @@
                 btn.title = `Stream ${s} – ${e}`;
                 btn.addEventListener('click', () => goToPage(p));
                 pagesNav.appendChild(btn);
-            }
+                last = p;
+            });
 
             const next = document.createElement('button');
             next.className = 'mv-page mv-arrow';
