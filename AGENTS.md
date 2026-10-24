@@ -29,7 +29,7 @@ git push origin main
 |---|---|
 | `index.html` | Home con la griglia dei canali (`normalChannels`, `fastChannels`, `digitaleChannels`) |
 | `player.html` | Player: stesso elenco canali di index.html + funzioni `updateNormalStream`, `updateStream`, `updateDigitaleStream` |
-| `multiview.html` | Multiview: 999 stream (`gomstream.xyz/live/stream-N.php`), 10 pagine da 100, max 10 preview live |
+| `multiview.html` | Multiview: 999 stream (`gomstream.xyz/live/stream-N.php`), 100 pagine da 10, max 10 preview live |
 | `index.css` | Tutti gli stili. Quando cambia, aggiornare il versione nei link: `index.css?v=NN` |
 | `sw.js` | Service worker. Quando cambia qualcosa, bumpare `CACHE_NAME` (`stream-grid-vN`) |
 | `it.m3u` | Playlist IPTV |

@@ -52,9 +52,11 @@
 
         // Salute della sorgente: se non risponde non si vede l'iframe
         // (niente pagine di errore del browser dentro la tile).
-        const PROBE_TIMEOUT = 5000;  // ms - attesa max del test di raggiungibilità
-        const RETRY_DELAY = 25000;   // ms - ripristino automatico delle tile in errore
+        const PROBE_TIMEOUT = 6000;  // ms - attesa max del test di raggiungibilità
+        const RETRY_DELAY = 25000;   // ms - ripristino automatico quando è giù
         const REVEAL_TIMEOUT = 2500; // ms - dopo questo l'anteprima si mostra comunque
+        const MOUNT_CONCURRENCY = 3; // player montati in contemporanea
+        const MOUNT_GAP = 350;       // ms - pausa fra un montaggio e l'altro
 
         const grid = document.getElementById('mv-grid');
         const pagesNav = document.getElementById('mv-pages');
@@ -69,6 +71,11 @@
         let page = 1;
         let observer = null;
         let retryTimer = null;
+        let sourceUp = null;      // null = ignoto, true/false dopo il test
+        let probeFailures = 0;    // fallimenti consecutivi del test
+        let probeInFlight = false;
+        let mountActive = 0;      // montaggi in corso
+        const mountQueue = [];    // tile in attesa di montaggio
         const visible = new Map();   // tile -> ratio di visibilita'
         const liveTiles = new Set(); // tile con iframe montato
 
@@ -162,42 +169,84 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // --- Montaggio iframe ----------------------------------------
-        // L'iframe parte subito (nessuna attesa: il player carica da subito);
-        // in parallelo un test rapido verifica che la sorgente risponda.
-        // Se non risponde si rimuove l'iframe e si mostra lo stato di errore
-        // invece della pagina di errore del browser dentro la tile.
-        function probe(url) {
+        // --- Sorgente -------------------------------------------------
+        // Tutti gli stream arrivano dallo stesso host: interrogare le 10 tile
+        // singolarmente lo mette in saturazione e smettono di caricare anche
+        // i player che funzionerebbero. Si fa invece UN solo test per la
+        // sorgente, prima di montare qualunque cosa.
+        function probe() {
             // da file:// fetch non è disponibile: si salta il controllo
-            if (location.protocol === 'file:') return Promise.resolve(true);
+            if (location.protocol === 'file:') return Promise.resolve({ ok: true, ms: 0 });
 
+            const t0 = Date.now();
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
-            return fetch(url, {
+            return fetch(streamUrl(pageRange(page)[0]), {
                 method: 'HEAD',
                 mode: 'no-cors',
                 cache: 'no-store',
                 credentials: 'omit',
                 signal: ctrl.signal
             })
-                .then(() => { clearTimeout(timer); return true; })
-                .catch(() => { clearTimeout(timer); return false; });
+                .then(() => { clearTimeout(timer); return { ok: true, ms: Date.now() - t0 }; })
+                .catch(() => { clearTimeout(timer); return { ok: false, ms: Date.now() - t0 }; });
         }
 
-        function mount(tile) {
-            if (tile.classList.contains('failed')) return; // in attesa di retry esplicito
-            if (tile.dataset.busy === '1') return;         // verifica già in corso
-            if (tile.querySelector('iframe')) return;      // già montata
+        async function ensureSource() {
+            if (sourceUp === true) return true;
+            const res = await probe();
+            if (res.ok) {
+                sourceUp = true;
+                probeFailures = 0;
+                return true;
+            }
+            probeFailures++;
+            // un rifiuto secco è inequivocabile e basta un tentativo;
+            // un timeout può essere solo congestione: meglio due di fila.
+            if (res.ms < 1500 || probeFailures >= 2) sourceUp = false;
+            return false;
+        }
 
-            tile.dataset.busy = '1';
-            mountFrame(tile);
-
-            probe(streamUrl(tile.dataset.n)).then(ok => {
-                tile.dataset.busy = '0';
-                if (!tile.isConnected) return;             // tile rimossa (cambio pagina)
-                if (ok) return;
-                markFailed(tile);                          // sorgente morta: si toglie l'iframe
+        function ensureSourceThen(fn) {
+            if (probeInFlight) return;
+            probeInFlight = true;
+            ensureSource().then(ok => {
+                probeInFlight = false;
+                if (ok) fn();
+                else markAllFailed();
             });
+        }
+
+        function markAllFailed() {
+            grid.querySelectorAll('.mv-tile').forEach(t => {
+                if (!t.querySelector('.mv-frame')) markFailed(t);
+            });
+        }
+
+        // --- Montaggio iframe ----------------------------------------
+        // Coda con concorrenza limitata: montare 10 player pesanti tutti
+        // insieme satura sia il browser sia la sorgente, e ogni player
+        // impiega poi molto di più ad avviarsi.
+        function mount(tile) {
+            if (tile.classList.contains('failed')) return; // in attesa di retry
+            if (tile.dataset.queued === '1') return;       // già in coda o montata
+            if (tile.querySelector('.mv-frame')) return;
+            tile.dataset.queued = '1';
+            mountQueue.push(tile);
+            pumpQueue();
+        }
+
+        function pumpQueue() {
+            while (mountActive < MOUNT_CONCURRENCY && mountQueue.length) {
+                const tile = mountQueue.shift();
+                if (!tile.isConnected || tile.classList.contains('failed') || tile.querySelector('.mv-frame')) continue;
+                mountActive++;
+                mountFrame(tile);
+                setTimeout(() => {
+                    mountActive--;
+                    pumpQueue();
+                }, MOUNT_GAP);
+            }
         }
 
         function mountFrame(tile) {
@@ -244,18 +293,31 @@
 
         function retryTile(tile) {
             tile.classList.remove('failed');
-            tile.dataset.busy = '0';
+            tile.dataset.queued = '0';
             mount(tile);
         }
 
         function retryFailed() {
-            grid.querySelectorAll('.mv-tile.failed').forEach(retryTile);
+            // si riparte da un controllo della sorgente: se è ancora giù
+            // non ha senso montare 10 iframe che falliscono tutti.
+            // (probeFailures NON si azzera: così dopo due cicli la sorgente
+            // viene dichiarata giù e syncLive smette di interrogarla)
+            sourceUp = null;
+            mountQueue.length = 0;
+            grid.querySelectorAll('.mv-tile.failed').forEach(t => {
+                t.classList.remove('failed');
+                t.dataset.queued = '0';
+            });
+            ensureSourceThen(syncLive);
         }
 
         // Con 10 tile per pagina una volta caricate restano montate:
         // prima venivano smontate a ogni scroll e l'intero player
         // veniva ricaricato ogni volta che si muoveva la pagina.
         function syncLive() {
+            if (sourceUp === false) return; // sorgente giù: l'avviso è già in pagina
+            if (sourceUp === null) { ensureSourceThen(syncLive); return; }
+
             const fsTile = document.fullscreenElement;
             const candidates = [];
             visible.forEach((ratio, tile) => {
@@ -285,7 +347,7 @@
                 </div>
                 <div class="mv-err">
                     <span class="mv-err-t">Sorgente non disponibile</span>
-                    <span class="mv-err-s">#${n} non risponde</span>
+                    <span class="mv-err-s">Stream #${n}</span>
                     <button class="mv-err-btn" type="button">Riprova</button>
                 </div>
                 <div class="mv-overlay" title="Apri a tutto schermo">
