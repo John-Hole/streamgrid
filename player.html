@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid | Player</title>
     <meta name="referrer" content="no-referrer">
-    <link rel="stylesheet" href="index.css?v=18">
+    <link rel="stylesheet" href="index.css?v=19">
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -62,7 +62,22 @@
             {"id": 10, "name": "Canale E2 🥈", "urls": ["/api/player?channel=euro2it", "https://wideiptv.top/player/euro2it"]},
             {"id": 11, "name": "Canale B 🏀", "urls": ["/api/player?channel=SkySportNBAIT", "https://wideiptv.top/player/SkySportNBAIT"]},
             {"id": 13, "name": "Canale F1 🏎️", "urls": ["/api/player?channel=SkySportF1IT", "https://wideiptv.top/player/SkySportF1IT"]},
-            {"id": 14, "name": "Canale Arena ⚔️", "urls": ["/api/player?channel=SkySportArenaIT", "https://wideiptv.top/player/SkySportArenaIT"]}
+            {"id": 14, "name": "Canale Arena ⚔️", "urls": ["/api/player?channel=SkySportArenaIT", "https://wideiptv.top/player/SkySportArenaIT"]},
+            {"id": 15, "name": "Canale Lavoro 2 🧰", "urls": [
+                "https://games.ok.ru/videoembed/16480725704243?nochat=1&autoplay=1",
+                "https://ch.nexa.st/ch.php?id=47",
+                "https://s2.kora.st/ch.php?id=47",
+                "https://sportylive.cfd/live/stream-870.php",
+                "https://sportylive.cfd/live/stream-55.php",
+                "https://web01.madplay77.ru/it/football/italian-serie-a-4441300/torino-vs-monza.html"
+            ], "labels": [
+                "Torino-Monza · OK.ru",
+                "Torino-Monza · Nexa (Sky Sport)",
+                "Torino-Monza · Kora (Sky Sport)",
+                "Torino-Monza · SportyLive 870",
+                "Empoli-Vicenza · SportyLive 55",
+                "MadPlay · Now TV IT"
+            ]}
         ];
 
         const digitaleChannels = [
@@ -120,12 +135,14 @@
 
             const selector = document.getElementById('modal-stream-selector');
             if (streamUrls.length > 1) {
-                const titles = streamUrls.map((u, i) => {
-                    if (u.startsWith('/api/')) return `Fonte ${i + 1} (Clean)`;
-                    if (u.includes('wideiptv')) return `Fonte ${i + 1} (Originale)`;
-                    if (u.includes('gomstream')) return `Fonte ${i + 1} (Gomstream)`;
-                    return `Fonte ${i + 1}`;
-                });
+                const titles = channel.labels
+                    ? channel.labels.map((l, i) => `Fonte ${i + 1} — ${l}`)
+                    : streamUrls.map((u, i) => {
+                        if (u.startsWith('/api/')) return `Fonte ${i + 1} (Clean)`;
+                        if (u.includes('wideiptv')) return `Fonte ${i + 1} (Originale)`;
+                        if (u.includes('gomstream')) return `Fonte ${i + 1} (Gomstream)`;
+                        return `Fonte ${i + 1}`;
+                    });
                 selector.style.display = 'flex';
                 selector.innerHTML = streamUrls.map((_, i) => `<button onclick='updateNormalStream(${JSON.stringify(channel)}, ${i})' class="selector-btn ${i === index ? 'active' : ''}" title="${titles[i]}">${i + 1}</button>`).join('');
             } else {
@@ -143,7 +160,9 @@
                 finalUrl = `${streamUrl}${separator}no_ads=1&ads=0&ad=0&advertising=0&banner=0&popup=0&disable_ads=true`;
             }
             const player = document.getElementById('main-player');
-            if (finalUrl.startsWith('/api/')) {
+            // Alcuni player (Gomstream/SportyLive/OK.ru/MadPlay) rifiutano il frame con sandbox
+            const noSandbox = /gomstream|sportylive|dembed|ok\.ru|okcdn|madplay77|mpanrc4imind|nexa\.st|kora\.st/i.test(finalUrl);
+            if (finalUrl.startsWith('/api/') || noSandbox) {
                 player.removeAttribute('sandbox');
                 player.setAttribute('allow', 'autoplay *; encrypted-media *; fullscreen *; picture-in-picture *;');
             } else {

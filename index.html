@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid</title>
-    <link rel="stylesheet" href="index.css?v=18">
+    <link rel="stylesheet" href="index.css?v=19">
     <meta name="description" content="Piattaforma di streaming per canali TV sportivi e d'intrattenimento.">
     
     <!-- PWA Settings -->
@@ -102,7 +102,8 @@
             {"id": 10, "name": "Canale E2 🥈", "urls": ["/api/player?channel=euro2it", "https://wideiptv.top/player/euro2it"]},
             {"id": 11, "name": "Canale B 🏀", "urls": ["/api/player?channel=SkySportNBAIT", "https://wideiptv.top/player/SkySportNBAIT"]},
             {"id": 13, "name": "Canale F1 🏎️", "urls": ["/api/player?channel=SkySportF1IT", "https://wideiptv.top/player/SkySportF1IT"]},
-            {"id": 14, "name": "Canale Arena ⚔️", "urls": ["/api/player?channel=SkySportArenaIT", "https://wideiptv.top/player/SkySportArenaIT"]}
+            {"id": 14, "name": "Canale Arena ⚔️", "urls": ["/api/player?channel=SkySportArenaIT", "https://wideiptv.top/player/SkySportArenaIT"]},
+            {"id": 15, "name": "Canale Lavoro 2 🧰", "sub": "6 fonti · OK.ru, SportyLive, Nexa, Kora, MadPlay"}
         ];
 
         const digitaleChannels = [
@@ -138,7 +139,7 @@
             normalGrid.innerHTML = normalChannels.map(ch => `
                 <div class="channel-card fade-in ${ch.isTest ? 'test-card' : ''}" onclick="window.location.href='${ch.href || `player.html?v=6&type=normal&id=${ch.id}`}'">
                     <div class="channel-name">${ch.name}${ch.badge ? `<span class="badge-test">${ch.badge}</span>` : ''}</div>
-                    ${ch.href ? '<div class="channel-type">100 pagine · 999 stream · preview live</div>' : ''}
+                    ${ch.sub ? `<div class="channel-type">${ch.sub}</div>` : (ch.href ? '<div class="channel-type">100 pagine · 999 stream · preview live</div>' : '')}
                 </div>
             `).join('');
 

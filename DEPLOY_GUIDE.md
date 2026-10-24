@@ -1,5 +1,11 @@
 # Guida al Deploy (GitHub -> Vercel)
 
+> ## ⚠️ REGOLA FONDAMENTALE
+> **Fare SEMPRE il deploy dopo ogni modifica al codice.**
+> Il lavoro non è finito finché non hai eseguito `git add .` → `git commit` → `git push origin main`.
+> Vercel pubblica il sito da solo pochi secondi dopo la push.
+> (Questa regola è duplicata in `AGENTS.md`, che la fa rispettare anche all'agente AI.)
+
 Dato che il progetto è collegato a Vercel tramite **GitHub**, il processo di deploy è completamente automatizzato. 
 
 Non è necessario utilizzare la CLI di Vercel locale (`npx vercel`), ma basta inviare (push) le modifiche al repository GitHub. Vercel intercetterà il caricamento e avvierà la build in automatico.

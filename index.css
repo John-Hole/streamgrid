@@ -439,6 +439,98 @@ body.mv-body {
     pointer-events: none;
 }
 
+/* --- Stato "sorgente non raggiungibile" --------------------------- */
+.mv-err {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 1rem;
+    text-align: center;
+    background: radial-gradient(ellipse at center, #17141c 0%, #0a0a0c 75%);
+}
+
+.mv-tile.failed .mv-err { display: flex; }
+.mv-tile.failed .mv-overlay { display: none; }
+.mv-tile.failed .mv-ph { opacity: 0; }
+
+.mv-err-t {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #9aa3b2;
+}
+
+.mv-err-s {
+    font-size: 0.68rem;
+    color: #5b6472;
+    font-variant-numeric: tabular-nums;
+}
+
+.mv-err-btn {
+    margin-top: 0.3rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-glass);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e7eb;
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mv-err-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+/* --- Avviso sorgente offline ------------------------------------- */
+.mv-alert {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin: 0.7rem 1.1rem 0;
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.7rem;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.1);
+    color: #fcd34d;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.mv-alert[hidden] { display: none; }
+.mv-alert b { color: #fde68a; }
+
+.mv-alert-btn {
+    padding: 0.3rem 0.8rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.18);
+    color: #fde68a;
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.mv-alert-btn:hover { background: rgba(245, 158, 11, 0.32); }
+
+/* Contatore in rosso quando la sorgente non risponde */
+.mv-stats.mv-down::before {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    animation: none;
+}
+
 .mv-stats {
     display: flex;
     align-items: center;

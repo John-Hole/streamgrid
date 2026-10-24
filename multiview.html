@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Grid | Multiview</title>
-    <link rel="stylesheet" href="index.css?v=18">
+    <link rel="stylesheet" href="index.css?v=19">
 
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -29,6 +29,11 @@
         <div class="mv-stats glass" id="mv-stats">0 / 10 live</div>
     </header>
 
+    <div class="mv-alert" id="mv-alert" hidden>
+        <span><b>Sorgente gomstream.xyz non raggiungibile</b> — <span id="mv-alert-count">0</span> preview offline</span>
+        <button type="button" class="mv-alert-btn" id="mv-alert-retry">Riprova ora</button>
+    </div>
+
     <main class="mv-grid" id="mv-grid"></main>
 
     <div class="mv-hint" id="mv-hint">Clicca un'anteprima per aprirla a tutto schermo · <b>Esc</b> per uscire</div>
@@ -45,18 +50,27 @@
         const MAX_LIVE = 10;
         const BASE_URL = 'https://gomstream.xyz/live/stream-';
 
+        // Salute della sorgente: se non risponde non si vede l'iframe
+        // (niente pagine di errore del browser dentro la tile).
+        const PROBE_TIMEOUT = 5000;  // ms - attesa max del test di raggiungibilità
+        const RETRY_DELAY = 25000;   // ms - ripristino automatico delle tile in errore
+        const REVEAL_TIMEOUT = 2500; // ms - dopo questo l'anteprima si mostra comunque
+
         const grid = document.getElementById('mv-grid');
         const pagesNav = document.getElementById('mv-pages');
         const rangeEl = document.getElementById('mv-range');
         const statsEl = document.getElementById('mv-stats');
         const hintEl = document.getElementById('mv-hint');
+        const alertEl = document.getElementById('mv-alert');
+        const alertRetry = document.getElementById('mv-alert-retry');
+        const alertCount = document.getElementById('mv-alert-count');
 
         // Stato
         let page = 1;
         let observer = null;
+        let retryTimer = null;
         const visible = new Map();   // tile -> ratio di visibilita'
         const liveTiles = new Set(); // tile con iframe montato
-        const unmountTimers = new Map();
 
         // --- Utility -------------------------------------------------
         function streamUrl(n) {
@@ -148,9 +162,45 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // --- Montaggio / smontaggio iframe ---------------------------
+        // --- Montaggio iframe ----------------------------------------
+        // L'iframe parte subito (nessuna attesa: il player carica da subito);
+        // in parallelo un test rapido verifica che la sorgente risponda.
+        // Se non risponde si rimuove l'iframe e si mostra lo stato di errore
+        // invece della pagina di errore del browser dentro la tile.
+        function probe(url) {
+            // da file:// fetch non è disponibile: si salta il controllo
+            if (location.protocol === 'file:') return Promise.resolve(true);
+
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
+            return fetch(url, {
+                method: 'HEAD',
+                mode: 'no-cors',
+                cache: 'no-store',
+                credentials: 'omit',
+                signal: ctrl.signal
+            })
+                .then(() => { clearTimeout(timer); return true; })
+                .catch(() => { clearTimeout(timer); return false; });
+        }
+
         function mount(tile) {
-            cancelUnmount(tile);
+            if (tile.classList.contains('failed')) return; // in attesa di retry esplicito
+            if (tile.dataset.busy === '1') return;         // verifica già in corso
+            if (tile.querySelector('iframe')) return;      // già montata
+
+            tile.dataset.busy = '1';
+            mountFrame(tile);
+
+            probe(streamUrl(tile.dataset.n)).then(ok => {
+                tile.dataset.busy = '0';
+                if (!tile.isConnected) return;             // tile rimossa (cambio pagina)
+                if (ok) return;
+                markFailed(tile);                          // sorgente morta: si toglie l'iframe
+            });
+        }
+
+        function mountFrame(tile) {
             if (tile.querySelector('iframe')) return;
 
             const n = tile.dataset.n;
@@ -158,48 +208,58 @@
             frame.className = 'mv-frame';
             frame.src = streamUrl(n);
             frame.title = `Stream ${n}`;
+            frame.loading = 'lazy';
+            frame.referrerPolicy = 'no-referrer'; // alcuni host rifiutano con referer
             frame.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
             frame.setAttribute('allowfullscreen', '');
-            frame.addEventListener('load', () => tile.classList.add('loaded'));
+
+            // Il documento dei player in diretta non finisce mai di caricare,
+            // quindi l'evento 'load' può non arrivare: dopo REVEAL_TIMEOUT
+            // l'anteprima viene mostrata comunque.
+            let revealed = false;
+            const reveal = () => {
+                if (revealed) return;
+                revealed = true;
+                clearTimeout(revealTimer);
+                tile.classList.remove('failed');
+                tile.classList.add('loaded');
+                updateStats();
+            };
+            const revealTimer = setTimeout(reveal, REVEAL_TIMEOUT);
+            frame.addEventListener('load', reveal);
+
             tile.appendChild(frame);
             liveTiles.add(tile);
             updateStats();
         }
 
-        function cancelUnmount(tile) {
-            const t = unmountTimers.get(tile);
-            if (t) {
-                clearTimeout(t);
-                unmountTimers.delete(tile);
-            }
-        }
-
-        function unmount(tile) {
-            cancelUnmount(tile);
-            if (document.fullscreenElement === tile) return;
+        function markFailed(tile) {
             const frame = tile.querySelector('iframe');
             if (frame) frame.remove();
             tile.classList.remove('loaded');
             liveTiles.delete(tile);
+            tile.classList.add('failed');
             updateStats();
         }
 
-        function scheduleUnmount(tile) {
-            if (!tile.querySelector('iframe') || unmountTimers.has(tile)) return;
-            const t = setTimeout(() => {
-                unmountTimers.delete(tile);
-                unmount(tile);
-            }, 1500);
-            unmountTimers.set(tile, t);
+        function retryTile(tile) {
+            tile.classList.remove('failed');
+            tile.dataset.busy = '0';
+            mount(tile);
         }
 
-        // tiene in diretta solo le MAX_LIVE anteprime piu' visibili
+        function retryFailed() {
+            grid.querySelectorAll('.mv-tile.failed').forEach(retryTile);
+        }
+
+        // Con 10 tile per pagina una volta caricate restano montate:
+        // prima venivano smontate a ogni scroll e l'intero player
+        // veniva ricaricato ogni volta che si muoveva la pagina.
         function syncLive() {
             const fsTile = document.fullscreenElement;
             const candidates = [];
             visible.forEach((ratio, tile) => {
                 if (!tile.isConnected) return;
-                if (tile.querySelector('iframe')) liveTiles.add(tile);
                 candidates.push([tile, ratio]);
             });
 
@@ -208,13 +268,8 @@
                 return parseInt(a[0].dataset.n, 10) - parseInt(b[0].dataset.n, 10);
             });
 
-            const keep = new Set(candidates.slice(0, MAX_LIVE).map(c => c[0]));
-            if (fsTile && fsTile.classList.contains('mv-tile')) keep.add(fsTile);
-
-            keep.forEach(tile => mount(tile));
-            liveTiles.forEach(tile => {
-                if (!keep.has(tile)) scheduleUnmount(tile);
-            });
+            candidates.slice(0, MAX_LIVE).forEach(c => mount(c[0]));
+            if (fsTile && fsTile.classList.contains('mv-tile')) mount(fsTile);
             updateStats();
         }
 
@@ -227,6 +282,11 @@
                 <div class="mv-ph">
                     <span class="mv-num">#${n}</span>
                     <span class="mv-live"><i></i>LIVE</span>
+                </div>
+                <div class="mv-err">
+                    <span class="mv-err-t">Sorgente non disponibile</span>
+                    <span class="mv-err-s">#${n} non risponde</span>
+                    <button class="mv-err-btn" type="button">Riprova</button>
                 </div>
                 <div class="mv-overlay" title="Apri a tutto schermo">
                     <span class="mv-ov-num">#${n}</span>
@@ -246,6 +306,10 @@
                 ev.stopPropagation();
                 exitFullscreen();
             });
+            tile.querySelector('.mv-err-btn').addEventListener('click', ev => {
+                ev.stopPropagation();
+                retryTile(tile);
+            });
 
             return tile;
         }
@@ -256,8 +320,6 @@
 
             // ripulizia
             if (observer) observer.disconnect();
-            unmountTimers.forEach(t => clearTimeout(t));
-            unmountTimers.clear();
             visible.clear();
             liveTiles.forEach(t => t.classList.remove('loaded'));
             liveTiles.clear();
@@ -290,7 +352,27 @@
         }
 
         function updateStats() {
-            statsEl.textContent = `${liveTiles.size} / ${MAX_LIVE} live`;
+            const offline = grid.querySelectorAll('.mv-tile.failed').length;
+            statsEl.classList.toggle('mv-down', offline > 0);
+            statsEl.textContent = offline
+                ? `${liveTiles.size} / ${MAX_LIVE} live · ${offline} offline`
+                : `${liveTiles.size} / ${MAX_LIVE} live`;
+            syncAlert(offline);
+        }
+
+        // Avviso in pagina quando la sorgente non risponde,
+        // con ripristino automatico finché non torna online.
+        function syncAlert(offline) {
+            if (!alertEl) return;
+            if (alertCount) alertCount.textContent = offline;
+            alertEl.hidden = offline === 0;
+
+            if (offline > 0 && retryTimer === null) {
+                retryTimer = setInterval(retryFailed, RETRY_DELAY);
+            } else if (offline === 0 && retryTimer !== null) {
+                clearInterval(retryTimer);
+                retryTimer = null;
+            }
         }
 
         // --- Fullscreen ----------------------------------------------
@@ -353,6 +435,8 @@
         readParams();
         writeParams();
         render();
+
+        if (alertRetry) alertRetry.addEventListener('click', retryFailed);
 
         // nasconde il suggerimento se non viene usato
         setTimeout(hideHint, 20000);
