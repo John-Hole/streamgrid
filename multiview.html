@@ -261,6 +261,12 @@
             frame.referrerPolicy = 'no-referrer'; // alcuni host rifiutano con referer
             frame.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
             frame.setAttribute('allowfullscreen', '');
+            // Niente allow-top-navigation: gli annunci dentro il player non
+            // possono più rubare la pagina (multiview veniva dirottato su un
+            // URL pubblicitario dopo pochi secondi). Il player continua a
+            // funzionare: verificato con stream-1 e stream-461.
+            frame.setAttribute('sandbox',
+                'allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-fullscreen');
 
             // Il documento dei player in diretta non finisce mai di caricare,
             // quindi l'evento 'load' può non arrivare: dopo REVEAL_TIMEOUT

@@ -39,9 +39,13 @@ quando si aggiunge o modifica un canale bisogna aggiornarli **entrambi**.
 
 ## Note tecniche
 
-- **Sandbox iframe**: alcuni host rifiutano l'iframe se ha l'attributo `sandbox`
-  (Gomstream, SportyLive, dembed, OK.ru, MadPlay, nexa.st, kora.st). Per questi
-  `updateNormalStream` rimuove il sandbox — non riaggiungerlo.
+- **Sandbox iframe**: in `player.html` (`updateNormalStream`) alcuni host
+  (SportyLive, dembed, OK.ru, MadPlay, nexa.st, kora.st) non caricano con lo
+  sandbox — non riaggiungerlo lì. In `multiview.html` lo sandbox invece **va
+  tenuto**: senza `allow-top-navigation` gli annunci dentro i player rubano la
+  pagina e multiview viene dirottato su un URL pubblicitario dopo pochi secondi.
+  Config verificata con gomstream (stream-1 e stream-461 riproducono lo stesso):
+  `allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-fullscreen`.
 - Le fonti "raw" (`edge.cowedd4855ws.sbs/.../index.m3u8`, `vsd209.okcdn.ru/...`) rispondono
   403 se caricate fuori dal player di origine: usare sempre la pagina player in iframe.
 - I link che passano da `https://href.li/?...` sono solo un mascheramento del referrer:
