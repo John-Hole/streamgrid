@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Grid | Multiview</title>
-    <link rel="stylesheet" href="index.css?v=19">
+    <title>Stream Grid | Multiview & Selettore POV</title>
+    <link rel="stylesheet" href="index.css?v=20">
 
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -21,12 +21,43 @@
 
         <div class="mv-heading">
             <span class="mv-title">Multiview 🧪</span>
-            <span class="mv-sub" id="mv-range">1 – 100</span>
+            <span class="mv-sub" id="mv-header-sub">Sfoglia & Seleziona POV</span>
         </div>
 
-        <nav class="mv-pages" id="mv-pages" aria-label="Pagine"></nav>
+        <!-- Selettore Modalità: 1 alla volta vs Griglia -->
+        <div class="mv-modes" role="tablist">
+            <button type="button" class="mv-mode-btn active" id="btn-mode-single" title="Sfoglia e valuta 1 POV alla volta (Zero rate limit)">
+                🔍 1 alla volta
+            </button>
+            <button type="button" class="mv-mode-btn" id="btn-mode-grid" title="Vista classica a griglia multiview">
+                ▦ Griglia
+            </button>
+        </div>
 
-        <div class="mv-stats glass" id="mv-stats">0 / 10 live</div>
+        <!-- Salto Rapido a numero POV -->
+        <form class="mv-jump-form" id="mv-jump-form" onsubmit="event.preventDefault(); handleJump();">
+            <span style="font-size: 0.75rem; color: #9ca3af; font-weight: 700;">#</span>
+            <input type="number" min="1" max="999" class="mv-jump-input" id="mv-jump-input" placeholder="1-999" title="Inserisci numero stream (1-999)">
+            <button type="submit" class="mv-jump-btn">Vai</button>
+        </form>
+
+        <!-- Contatori / Gestione Liste -->
+        <div class="mv-meta-actions">
+            <button type="button" class="mv-pill-btn mv-pill-saved" id="btn-open-saved" title="Mostra e gestisci i POV tenuti/salvati">
+                ★ <span id="count-saved">0</span> Tenuti
+            </button>
+            <button type="button" class="mv-pill-btn mv-pill-discarded" id="btn-open-discarded" title="Mostra e gestisci i POV scartati">
+                🗑 <span id="count-discarded">0</span> Scartati
+            </button>
+            <button type="button" class="mv-pill-btn" id="btn-open-manage" title="Gestione, esportazione e backup liste">
+                ⚙️ Liste
+            </button>
+        </div>
+
+        <!-- Paginazione (visibile solo in modalità griglia) -->
+        <nav class="mv-pages" id="mv-pages" aria-label="Pagine" style="display: none;"></nav>
+
+        <div class="mv-stats glass" id="mv-stats" style="display: none;">0 / 6 live</div>
     </header>
 
     <div class="mv-alert" id="mv-alert" hidden>
@@ -34,319 +65,533 @@
         <button type="button" class="mv-alert-btn" id="mv-alert-retry">Riprova ora</button>
     </div>
 
-    <main class="mv-grid" id="mv-grid"></main>
+    <!-- ============================================================== -->
+    <!-- MODALITÀ 1: REVISIONE & SFOGLIO 1 ALLA VOLTA (Zero rate-limit) -->
+    <!-- ============================================================== -->
+    <main class="mv-single-wrap" id="mv-single-view">
+        <section class="mv-single-card">
+            <!-- Barra superiore scheda -->
+            <div class="mv-single-top">
+                <div class="mv-single-title-box">
+                    <span class="mv-single-num" id="sv-num">#1</span>
+                    <span class="mv-status-badge status-pending" id="sv-status">⏳ Da verificare</span>
+                </div>
+                <div class="mv-single-meta">
+                    <span id="sv-progress">Stream 1 di 999</span>
+                    <button type="button" class="mv-icon-btn" id="sv-btn-fs" title="Schermo intero (tasto F)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                    </button>
+                </div>
+            </div>
 
-    <div class="mv-hint" id="mv-hint">Clicca un'anteprima per aprirla a tutto schermo · <b>Esc</b> per uscire</div>
+            <!-- Viewport Player Singolo -->
+            <div class="mv-single-viewport" id="sv-viewport">
+                <div class="mv-single-loader" id="sv-loader">
+                    <div class="mv-single-spinner"></div>
+                    <span style="font-weight: 700; font-size: 0.9rem;" id="sv-loader-text">Caricamento POV #1...</span>
+                </div>
+                <div id="sv-frame-slot"></div>
+                <button class="mv-exit" id="sv-exit-fs" type="button" title="Esci da tutto schermo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <!-- Barra delle Azioni (Scarta / Tieni / Salta) -->
+            <div class="mv-single-controls">
+                <button type="button" class="mv-act-btn mv-act-nav" id="sv-btn-prev" title="Vai al precedente (Freccia Sinistra)">
+                    ❮
+                </button>
+                <button type="button" class="mv-act-btn mv-act-discard" id="sv-btn-discard" title="Elimina/Scarta questo POV e vai avanti (tasto D)">
+                    🗑 Scarta ed elimina <kbd>D</kbd>
+                </button>
+                <button type="button" class="mv-act-btn mv-act-skip" id="sv-btn-skip" title="Salta al successivo senza decidere (Freccia Destra)">
+                    Salta ❯ <kbd>→</kbd>
+                </button>
+                <button type="button" class="mv-act-btn mv-act-keep" id="sv-btn-keep" title="Tieni/Salva nei preferiti e vai avanti (tasto S)">
+                    ★ Tieni e salva <kbd>S</kbd>
+                </button>
+                <button type="button" class="mv-act-btn mv-act-nav" id="sv-btn-next" title="Vai al successivo (Freccia Destra)">
+                    ❯
+                </button>
+            </div>
+
+            <!-- Opzioni & Scorciatoie -->
+            <div class="mv-single-opts">
+                <label class="mv-opt-label">
+                    <input type="checkbox" id="sv-opt-autonext" checked>
+                    <span>Avanza automaticamente dopo la scelta (Tieni / Scarta)</span>
+                </label>
+                <label class="mv-opt-label">
+                    <input type="checkbox" id="sv-opt-skipdiscarded" checked>
+                    <span>Salta i POV già eliminati durante lo scorrimento</span>
+                </label>
+                <span class="mv-kbd-help">
+                    Tasti rapidi: <b>S</b> Tieni · <b>D</b> Scarta · <b>◀ / ▶</b> Frecce per scorrere · <b>F</b> Schermo intero
+                </span>
+            </div>
+        </section>
+    </main>
+
+    <!-- ============================================================== -->
+    <!-- MODALITÀ 2: VISTA GRIGLIA MULTIVIEW CLASSICA & FILTRATA        -->
+    <!-- ============================================================== -->
+    <div id="mv-grid-view" style="display: none;">
+        <div class="mv-grid-bar">
+            <div class="mv-filters" id="mv-grid-filters">
+                <button type="button" class="mv-filter-btn active" data-filter="valid">Attivi (tranne eliminati)</button>
+                <button type="button" class="mv-filter-btn" data-filter="saved">★ Solo Tenuti</button>
+                <button type="button" class="mv-filter-btn" data-filter="all">Tutti (1-999)</button>
+                <button type="button" class="mv-filter-btn" data-filter="discarded">🗑 Solo Eliminati</button>
+            </div>
+            <span class="mv-sub" id="mv-grid-summary">10 di 999</span>
+        </div>
+        <main class="mv-grid" id="mv-grid"></main>
+    </div>
+
+    <!-- Modale Gestione Liste & Esportazione -->
+    <div class="mv-modal-backdrop" id="mv-modal" style="display: none;">
+        <div class="mv-modal">
+            <div class="mv-modal-header">
+                <span class="mv-modal-title" id="modal-title">I Miei POV & Liste</span>
+                <button type="button" class="mv-modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="mv-modal-tabs">
+                <button type="button" class="mv-modal-tab active" data-tab="saved" id="tab-btn-saved">★ Tenuti (<span id="modal-c-saved">0</span>)</button>
+                <button type="button" class="mv-modal-tab" data-tab="discarded" id="tab-btn-discarded">🗑 Scartati (<span id="modal-c-discarded">0</span>)</button>
+                <button type="button" class="mv-modal-tab" data-tab="backup" id="tab-btn-backup">💾 Esporta / Backup</button>
+            </div>
+            <div class="mv-modal-body" id="modal-body"></div>
+            <div class="mv-modal-actions" id="modal-actions"></div>
+        </div>
+    </div>
+
+    <div class="mv-hint" id="mv-hint">Usa i tasti <b>S</b> per Tenere o <b>D</b> per Eliminare e passare al prossimo</div>
 
     <script>
         // ============================================================
-        //  MULTIVIEW - 999 stream divisi in 100 pagine da 10
-        //  Massimo 10 preview in diretta contemporaneamente:
-        //  le altre si caricano man mano che si scorre.
+        //  MULTIVIEW & SELETTORE POV - Gestione completa 999 stream
+        //  - Modalità 1: Ispettore 1 a 1 (Zero Rate-Limit)
+        //  - Modalità 2: Griglia Multiview con filtri
+        //  - Persistenza localStorage (Salvati & Eliminati)
         // ============================================================
         const TOTAL = 999;
-        const PER_PAGE = 10;
-        const PAGE_COUNT = Math.ceil(TOTAL / PER_PAGE); // 100
-        const MAX_LIVE = 10;
         const BASE_URL = 'https://gomstream.xyz/live/stream-';
+        const PER_PAGE = 10;
+        const MAX_LIVE = 6;
+        const MOUNT_CONCURRENCY = 2;
+        const MOUNT_GAP = 400;
+        const REVEAL_TIMEOUT = 2500;
 
-        // Salute della sorgente: se non risponde non si vede l'iframe
-        // (niente pagine di errore del browser dentro la tile).
-        const PROBE_TIMEOUT = 6000;  // ms - attesa max del test di raggiungibilità
-        const RETRY_DELAY = 25000;   // ms - ripristino automatico quando è giù
-        const REVEAL_TIMEOUT = 2500; // ms - dopo questo l'anteprima si mostra comunque
-        const MOUNT_CONCURRENCY = 3; // player montati in contemporanea
-        const MOUNT_GAP = 350;       // ms - pausa fra un montaggio e l'altro
+        // Chiavi LocalStorage
+        const KEY_SAVED = 'streamgrid_mv_saved';
+        const KEY_DISCARDED = 'streamgrid_mv_discarded';
+        const KEY_MODE = 'streamgrid_mv_mode';
+        const KEY_LAST_N = 'streamgrid_mv_last_n';
+        const KEY_AUTONEXT = 'streamgrid_mv_autonext';
+        const KEY_SKIPDISCARDED = 'streamgrid_mv_skipdiscarded';
 
-        const grid = document.getElementById('mv-grid');
+        // Caricamento Liste
+        let savedSet = new Set();
+        let discardedSet = new Set();
+        try {
+            const rawSaved = localStorage.getItem(KEY_SAVED);
+            if (rawSaved) JSON.parse(rawSaved).forEach(n => savedSet.add(Number(n)));
+            const rawDisc = localStorage.getItem(KEY_DISCARDED);
+            if (rawDisc) JSON.parse(rawDisc).forEach(n => discardedSet.add(Number(n)));
+        } catch (e) {
+            console.warn('Errore lettura localStorage', e);
+        }
+
+        function persist() {
+            try {
+                localStorage.setItem(KEY_SAVED, JSON.stringify([...savedSet].sort((a,b)=>a-b)));
+                localStorage.setItem(KEY_DISCARDED, JSON.stringify([...discardedSet].sort((a,b)=>a-b)));
+            } catch (e) {}
+            updateCounters();
+        }
+
+        // Stato Generale
+        let currentMode = localStorage.getItem(KEY_MODE) || 'single'; // 'single' | 'grid'
+        let currentN = 1;
+        let singleMountTimer = null;
+        let autoNext = localStorage.getItem(KEY_AUTONEXT) !== 'false';
+        let skipDiscarded = localStorage.getItem(KEY_SKIPDISCARDED) !== 'false';
+
+        // Stato Griglia
+        let gridFilter = 'valid'; // 'valid' | 'saved' | 'all' | 'discarded'
+        let gridPage = 1;
+        let gridFilteredStreams = [];
+        let gridObserver = null;
+        let mountActive = 0;
+        const mountQueue = [];
+        const visible = new Map();
+        const liveTiles = new Set();
+
+        // Elementi DOM
+        const headerSub = document.getElementById('mv-header-sub');
+        const btnModeSingle = document.getElementById('btn-mode-single');
+        const btnModeGrid = document.getElementById('btn-mode-grid');
+        const jumpInput = document.getElementById('mv-jump-input');
+        const countSavedEl = document.getElementById('count-saved');
+        const countDiscardedEl = document.getElementById('count-discarded');
         const pagesNav = document.getElementById('mv-pages');
-        const rangeEl = document.getElementById('mv-range');
         const statsEl = document.getElementById('mv-stats');
-        const hintEl = document.getElementById('mv-hint');
-        const alertEl = document.getElementById('mv-alert');
-        const alertRetry = document.getElementById('mv-alert-retry');
-        const alertCount = document.getElementById('mv-alert-count');
 
-        // Stato
-        let page = 1;
-        let observer = null;
-        let retryTimer = null;
-        let sourceUp = null;      // null = ignoto, true/false dopo il test
-        let probeFailures = 0;    // fallimenti consecutivi del test
-        let probeInFlight = false;
-        let mountActive = 0;      // montaggi in corso
-        const mountQueue = [];    // tile in attesa di montaggio
-        const visible = new Map();   // tile -> ratio di visibilita'
-        const liveTiles = new Set(); // tile con iframe montato
+        // Single DOM
+        const singleView = document.getElementById('mv-single-view');
+        const svNum = document.getElementById('sv-num');
+        const svStatus = document.getElementById('sv-status');
+        const svProgress = document.getElementById('sv-progress');
+        const svViewport = document.getElementById('sv-viewport');
+        const svSlot = document.getElementById('sv-frame-slot');
+        const svLoader = document.getElementById('sv-loader');
+        const svLoaderText = document.getElementById('sv-loader-text');
+        const svBtnFs = document.getElementById('sv-btn-fs');
+        const svExitFs = document.getElementById('sv-exit-fs');
+        const svBtnPrev = document.getElementById('sv-btn-prev');
+        const svBtnNext = document.getElementById('sv-btn-next');
+        const svBtnDiscard = document.getElementById('sv-btn-discard');
+        const svBtnKeep = document.getElementById('sv-btn-keep');
+        const svBtnSkip = document.getElementById('sv-btn-skip');
+        const svOptAutoNext = document.getElementById('sv-opt-autonext');
+        const svOptSkipDisc = document.getElementById('sv-opt-skipdiscarded');
 
-        // --- Utility -------------------------------------------------
+        // Grid DOM
+        const gridView = document.getElementById('mv-grid-view');
+        const gridEl = document.getElementById('mv-grid');
+        const gridSummary = document.getElementById('mv-grid-summary');
+
+        // Modal DOM
+        const modalEl = document.getElementById('mv-modal');
+        const modalClose = document.getElementById('modal-close');
+        const modalBody = document.getElementById('modal-body');
+        const modalActions = document.getElementById('modal-actions');
+        const modalCSaved = document.getElementById('modal-c-saved');
+        const modalCDiscarded = document.getElementById('modal-c-discarded');
+        let activeModalTab = 'saved';
+
+        // URL dello stream
         function streamUrl(n) {
             return `${BASE_URL}${n}.php`;
         }
 
-        function pageRange(p) {
-            const start = (p - 1) * PER_PAGE + 1;
-            const end = Math.min(p * PER_PAGE, TOTAL);
-            return [start, end];
+        function updateCounters() {
+            countSavedEl.textContent = savedSet.size;
+            countDiscardedEl.textContent = discardedSet.size;
+            modalCSaved.textContent = savedSet.size;
+            modalCDiscarded.textContent = discardedSet.size;
         }
 
-        function clampPage(p) {
-            if (!p || isNaN(p)) return 1;
-            return Math.min(Math.max(parseInt(p, 10), 1), PAGE_COUNT);
+        // ============================================================
+        //  MODALITÀ COMMUTABILE (1 ALLA VOLTA vs GRIGLIA)
+        // ============================================================
+        function setMode(mode) {
+            currentMode = mode;
+            localStorage.setItem(KEY_MODE, mode);
+
+            btnModeSingle.classList.toggle('active', mode === 'single');
+            btnModeGrid.classList.toggle('active', mode === 'grid');
+
+            if (mode === 'single') {
+                gridView.style.display = 'none';
+                pagesNav.style.display = 'none';
+                statsEl.style.display = 'none';
+                singleView.style.display = 'flex';
+                headerSub.textContent = 'Ispettore POV 1 a 1';
+
+                // Stop grid playback
+                cleanGrid();
+                loadSingleStream(currentN);
+            } else {
+                singleView.style.display = 'none';
+                // Stop single playback
+                cleanSingle();
+                gridView.style.display = 'block';
+                pagesNav.style.display = 'flex';
+                statsEl.style.display = 'flex';
+                headerSub.textContent = 'Griglia Multiview';
+                updateGridFilterList();
+                renderGrid();
+            }
         }
 
-        function readParams() {
-            const params = new URLSearchParams(window.location.search);
-            page = clampPage(params.get('p'));
-        }
+        btnModeSingle.addEventListener('click', () => setMode('single'));
+        btnModeGrid.addEventListener('click', () => setMode('grid'));
 
-        function writeParams() {
+        // ============================================================
+        //  LOGICA MODALITÀ 1 A 1 (SINGLE VIEW)
+        // ============================================================
+        function loadSingleStream(n, forceReload = false) {
+            n = Math.max(1, Math.min(TOTAL, parseInt(n, 10) || 1));
+            currentN = n;
+            localStorage.setItem(KEY_LAST_N, n);
+
+            // Aggiorna URL senza ricaricare la pagina
             try {
-                const url = new URL(window.location.href);
-                url.searchParams.set('p', page);
-                history.replaceState(null, '', url.toString());
-            } catch (e) { /* file:// fallback */ }
+                const u = new URL(window.location.href);
+                u.searchParams.set('s', n);
+                history.replaceState(null, '', u.toString());
+            } catch (e) {}
+
+            // Intestazione & Stato
+            svNum.textContent = `#${n}`;
+            svProgress.textContent = `Stream ${n} di ${TOTAL}`;
+            updateSingleStatusBadge(n);
+
+            // Abilita/Disabilita nav
+            svBtnPrev.disabled = (n <= 1);
+            svBtnNext.disabled = (n >= TOTAL);
+
+            // Pulizia frame precedente
+            cleanSingle();
+
+            // Mostra loader
+            svLoader.style.display = 'flex';
+            svLoaderText.textContent = `Caricamento POV #${n}...`;
+
+            // Debounce di 200ms per evitare richieste a raffica su click continui
+            clearTimeout(singleMountTimer);
+            singleMountTimer = setTimeout(() => {
+                mountSingleFrame(n);
+            }, 200);
         }
 
-        // --- Paginazione ---------------------------------------------
-        function buildPages() {
-            pagesNav.innerHTML = '';
-
-            const prev = document.createElement('button');
-            prev.className = 'mv-page mv-arrow';
-            prev.type = 'button';
-            prev.innerHTML = '&lsaquo;';
-            prev.title = 'Pagina precedente';
-            prev.disabled = page <= 1;
-            prev.addEventListener('click', () => goToPage(page - 1));
-            pagesNav.appendChild(prev);
-
-            // Con 100 pagine non entrano tutti i numeri in header:
-            // si mostrano prima, ultima e corrente ±2, con i puntini di salto.
-            const items = [1, PAGE_COUNT];
-            for (let p = page - 2; p <= page + 2; p++) {
-                if (p >= 1 && p <= PAGE_COUNT) items.push(p);
-            }
-            const unique = [...new Set(items)].sort((a, b) => a - b);
-
-            let last = 0;
-            unique.forEach(p => {
-                if (p - last > 1) {
-                    const dots = document.createElement('span');
-                    dots.className = 'mv-page mv-dots';
-                    dots.textContent = '…';
-                    dots.title = `Stream ${last + 1} – ${p - 1}`;
-                    pagesNav.appendChild(dots);
-                }
-
-                const [s, e] = pageRange(p);
-                const btn = document.createElement('button');
-                btn.className = 'mv-page' + (p === page ? ' active' : '');
-                btn.type = 'button';
-                btn.textContent = p;
-                btn.title = `Stream ${s} – ${e}`;
-                btn.addEventListener('click', () => goToPage(p));
-                pagesNav.appendChild(btn);
-                last = p;
-            });
-
-            const next = document.createElement('button');
-            next.className = 'mv-page mv-arrow';
-            next.type = 'button';
-            next.innerHTML = '&rsaquo;';
-            next.title = 'Pagina successiva';
-            next.disabled = page >= PAGE_COUNT;
-            next.addEventListener('click', () => goToPage(page + 1));
-            pagesNav.appendChild(next);
-        }
-
-        function goToPage(p) {
-            p = clampPage(p);
-            if (p === page) return;
-            page = p;
-            writeParams();
-            render();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // --- Sorgente -------------------------------------------------
-        // Tutti gli stream arrivano dallo stesso host: interrogare le 10 tile
-        // singolarmente lo mette in saturazione e smettono di caricare anche
-        // i player che funzionerebbero. Si fa invece UN solo test per la
-        // sorgente, prima di montare qualunque cosa.
-        function probe() {
-            // da file:// fetch non è disponibile: si salta il controllo
-            if (location.protocol === 'file:') return Promise.resolve({ ok: true, ms: 0 });
-
-            const t0 = Date.now();
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
-            return fetch(streamUrl(pageRange(page)[0]), {
-                method: 'HEAD',
-                mode: 'no-cors',
-                cache: 'no-store',
-                credentials: 'omit',
-                signal: ctrl.signal
-            })
-                .then(() => { clearTimeout(timer); return { ok: true, ms: Date.now() - t0 }; })
-                .catch(() => { clearTimeout(timer); return { ok: false, ms: Date.now() - t0 }; });
-        }
-
-        async function ensureSource() {
-            if (sourceUp === true) return true;
-            const res = await probe();
-            if (res.ok) {
-                sourceUp = true;
-                probeFailures = 0;
-                return true;
-            }
-            probeFailures++;
-            // un rifiuto secco è inequivocabile e basta un tentativo;
-            // un timeout può essere solo congestione: meglio due di fila.
-            if (res.ms < 1500 || probeFailures >= 2) sourceUp = false;
-            return false;
-        }
-
-        function ensureSourceThen(fn) {
-            if (probeInFlight) return;
-            probeInFlight = true;
-            ensureSource().then(ok => {
-                probeInFlight = false;
-                if (ok) fn();
-                else markAllFailed();
-            });
-        }
-
-        function markAllFailed() {
-            grid.querySelectorAll('.mv-tile').forEach(t => {
-                if (!t.querySelector('.mv-frame')) markFailed(t);
-            });
-        }
-
-        // --- Montaggio iframe ----------------------------------------
-        // Coda con concorrenza limitata: montare 10 player pesanti tutti
-        // insieme satura sia il browser sia la sorgente, e ogni player
-        // impiega poi molto di più ad avviarsi.
-        function mount(tile) {
-            if (tile.classList.contains('failed')) return; // in attesa di retry
-            if (tile.dataset.queued === '1') return;       // già in coda o montata
-            if (tile.querySelector('.mv-frame')) return;
-            tile.dataset.queued = '1';
-            mountQueue.push(tile);
-            pumpQueue();
-        }
-
-        function pumpQueue() {
-            while (mountActive < MOUNT_CONCURRENCY && mountQueue.length) {
-                const tile = mountQueue.shift();
-                if (!tile.isConnected || tile.classList.contains('failed') || tile.querySelector('.mv-frame')) continue;
-                mountActive++;
-                mountFrame(tile);
-                setTimeout(() => {
-                    mountActive--;
-                    pumpQueue();
-                }, MOUNT_GAP);
+        function updateSingleStatusBadge(n) {
+            svStatus.className = 'mv-status-badge';
+            if (savedSet.has(n)) {
+                svStatus.classList.add('status-saved');
+                svStatus.textContent = '★ Tenuto nei preferiti';
+            } else if (discardedSet.has(n)) {
+                svStatus.classList.add('status-discarded');
+                svStatus.textContent = '🗑 Eliminato / Scartato';
+            } else {
+                svStatus.classList.add('status-pending');
+                svStatus.textContent = '⏳ Da verificare';
             }
         }
 
-        function mountFrame(tile) {
-            if (tile.querySelector('iframe')) return;
+        function mountSingleFrame(n) {
+            cleanSingle();
 
-            const n = tile.dataset.n;
             const frame = document.createElement('iframe');
-            frame.className = 'mv-frame';
             frame.src = streamUrl(n);
             frame.title = `Stream ${n}`;
-            frame.loading = 'lazy';
-            frame.referrerPolicy = 'no-referrer'; // alcuni host rifiutano con referer
+            frame.referrerPolicy = 'no-referrer';
             frame.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
             frame.setAttribute('allowfullscreen', '');
-            // Niente allow-top-navigation: gli annunci dentro il player non
-            // possono più rubare la pagina (multiview veniva dirottato su un
-            // URL pubblicitario dopo pochi secondi). Il player continua a
-            // funzionare: verificato con stream-1 e stream-461.
-            frame.setAttribute('sandbox',
-                'allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-fullscreen');
+            // Sandbox antifrode per bloccare dirottamento pagina da parte degli ads
+            frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-fullscreen');
 
-            // Il documento dei player in diretta non finisce mai di caricare,
-            // quindi l'evento 'load' può non arrivare: dopo REVEAL_TIMEOUT
-            // l'anteprima viene mostrata comunque.
             let revealed = false;
             const reveal = () => {
                 if (revealed) return;
                 revealed = true;
-                clearTimeout(revealTimer);
-                tile.classList.remove('failed');
-                tile.classList.add('loaded');
-                updateStats();
+                svLoader.style.display = 'none';
             };
-            const revealTimer = setTimeout(reveal, REVEAL_TIMEOUT);
-            frame.addEventListener('load', reveal);
 
-            tile.appendChild(frame);
-            liveTiles.add(tile);
+            const timer = setTimeout(reveal, REVEAL_TIMEOUT);
+            frame.addEventListener('load', () => {
+                clearTimeout(timer);
+                reveal();
+            });
+
+            svSlot.appendChild(frame);
+        }
+
+        function cleanSingle() {
+            clearTimeout(singleMountTimer);
+            const frame = svSlot.querySelector('iframe');
+            if (frame) {
+                try { frame.src = 'about:blank'; } catch (e) {}
+                frame.remove();
+            }
+        }
+
+        // Trova il prossimo stream valido
+        function getNextN(fromN, direction = 1) {
+            let next = fromN + direction;
+            if (!skipDiscarded) {
+                return Math.max(1, Math.min(TOTAL, next));
+            }
+            while (next >= 1 && next <= TOTAL) {
+                if (!discardedSet.has(next)) return next;
+                next += direction;
+            }
+            // Se sono tutti scartati o fine lista
+            return Math.max(1, Math.min(TOTAL, fromN + direction));
+        }
+
+        // Azione: Tieni / Salva
+        function actionKeep() {
+            savedSet.add(currentN);
+            discardedSet.delete(currentN);
+            persist();
+            updateSingleStatusBadge(currentN);
+
+            if (autoNext) {
+                const next = getNextN(currentN, 1);
+                if (next !== currentN) loadSingleStream(next);
+            }
+        }
+
+        // Azione: Scarta / Elimina
+        function actionDiscard() {
+            discardedSet.add(currentN);
+            savedSet.delete(currentN);
+            persist();
+            updateSingleStatusBadge(currentN);
+
+            if (autoNext) {
+                const next = getNextN(currentN, 1);
+                if (next !== currentN) loadSingleStream(next);
+            }
+        }
+
+        // Azione: Salta
+        function actionSkip() {
+            const next = getNextN(currentN, 1);
+            if (next !== currentN) loadSingleStream(next);
+        }
+
+        // Navigazione
+        svBtnPrev.addEventListener('click', () => {
+            const prev = getNextN(currentN, -1);
+            if (prev !== currentN) loadSingleStream(prev);
+        });
+        svBtnNext.addEventListener('click', () => {
+            const next = getNextN(currentN, 1);
+            if (next !== currentN) loadSingleStream(next);
+        });
+        svBtnDiscard.addEventListener('click', actionDiscard);
+        svBtnKeep.addEventListener('click', actionKeep);
+        svBtnSkip.addEventListener('click', actionSkip);
+
+        // Opzioni
+        svOptAutoNext.checked = autoNext;
+        svOptAutoNext.addEventListener('change', e => {
+            autoNext = e.target.checked;
+            localStorage.setItem(KEY_AUTONEXT, autoNext);
+        });
+
+        svOptSkipDisc.checked = skipDiscarded;
+        svOptSkipDisc.addEventListener('change', e => {
+            skipDiscarded = e.target.checked;
+            localStorage.setItem(KEY_SKIPDISCARDED, skipDiscarded);
+        });
+
+        // Salto rapido a numero
+        function handleJump() {
+            const val = parseInt(jumpInput.value, 10);
+            if (val && val >= 1 && val <= TOTAL) {
+                jumpInput.value = '';
+                if (currentMode === 'single') {
+                    loadSingleStream(val);
+                } else {
+                    // Trova la pagina corrispondente nella griglia
+                    const idx = gridFilteredStreams.indexOf(val);
+                    if (idx !== -1) {
+                        gridPage = Math.floor(idx / PER_PAGE) + 1;
+                        renderGrid();
+                    } else {
+                        // Passa a vista all o mostra direttamente in single
+                        setMode('single');
+                        loadSingleStream(val);
+                    }
+                }
+            }
+        }
+
+        // Fullscreen single view
+        function toggleSingleFs() {
+            if (!document.fullscreenElement) {
+                if (svViewport.requestFullscreen) svViewport.requestFullscreen();
+                else if (svViewport.webkitRequestFullscreen) svViewport.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+        svBtnFs.addEventListener('click', toggleSingleFs);
+        svExitFs.addEventListener('click', () => {
+            if (document.exitFullscreen) document.exitFullscreen();
+        });
+
+        // ============================================================
+        //  LOGICA MODALITÀ GRIGLIA MULTIVIEW (FILTRATA & OTTIMIZZATA)
+        // ============================================================
+        function updateGridFilterList() {
+            gridFilteredStreams = [];
+            for (let n = 1; n <= TOTAL; n++) {
+                if (gridFilter === 'valid') {
+                    if (!discardedSet.has(n)) gridFilteredStreams.push(n);
+                } else if (gridFilter === 'saved') {
+                    if (savedSet.has(n)) gridFilteredStreams.push(n);
+                } else if (gridFilter === 'discarded') {
+                    if (discardedSet.has(n)) gridFilteredStreams.push(n);
+                } else {
+                    gridFilteredStreams.push(n);
+                }
+            }
+            gridPage = Math.min(gridPage, Math.max(1, Math.ceil(gridFilteredStreams.length / PER_PAGE)));
+        }
+
+        function renderGrid() {
+            cleanGrid();
+            const totalStreams = gridFilteredStreams.length;
+            const pageCount = Math.max(1, Math.ceil(totalStreams / PER_PAGE));
+            gridPage = Math.min(Math.max(1, gridPage), pageCount);
+
+            const startIdx = (gridPage - 1) * PER_PAGE;
+            const endIdx = Math.min(startIdx + PER_PAGE, totalStreams);
+            const currentStreams = gridFilteredStreams.slice(startIdx, endIdx);
+
+            gridSummary.textContent = totalStreams > 0 
+                ? `${startIdx + 1} – ${endIdx} di ${totalStreams} (${pageCount} pag.)`
+                : 'Nessun canale in questo filtro';
+
+            gridEl.innerHTML = '';
+
+            if (currentStreams.length === 0) {
+                gridEl.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #9ca3af;">
+                        <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Nessun POV trovato per questo filtro.</p>
+                        <p style="font-size: 0.85rem;">Prova a selezionare "Attivi" o usa la modalità <b>1 alla volta</b> per valutarli.</p>
+                    </div>`;
+                buildGridPages(pageCount);
+                updateStats();
+                return;
+            }
+
+            const frag = document.createDocumentFragment();
+            currentStreams.forEach(n => {
+                frag.appendChild(createGridTile(n));
+            });
+            gridEl.appendChild(frag);
+
+            gridObserver = new IntersectionObserver(onGridIntersect, {
+                root: null,
+                rootMargin: '100px 0px',
+                threshold: [0, 0.25, 0.5, 0.75, 1]
+            });
+            gridEl.querySelectorAll('.mv-tile').forEach(t => gridObserver.observe(t));
+
+            buildGridPages(pageCount);
             updateStats();
         }
 
-        function markFailed(tile) {
-            const frame = tile.querySelector('iframe');
-            if (frame) frame.remove();
-            tile.classList.remove('loaded');
-            liveTiles.delete(tile);
-            tile.classList.add('failed');
-            updateStats();
-        }
-
-        function retryTile(tile) {
-            tile.classList.remove('failed');
-            tile.dataset.queued = '0';
-            mount(tile);
-        }
-
-        function retryFailed() {
-            // si riparte da un controllo della sorgente: se è ancora giù
-            // non ha senso montare 10 iframe che falliscono tutti.
-            // (probeFailures NON si azzera: così dopo due cicli la sorgente
-            // viene dichiarata giù e syncLive smette di interrogarla)
-            sourceUp = null;
-            mountQueue.length = 0;
-            grid.querySelectorAll('.mv-tile.failed').forEach(t => {
-                t.classList.remove('failed');
-                t.dataset.queued = '0';
-            });
-            ensureSourceThen(syncLive);
-        }
-
-        // Con 10 tile per pagina una volta caricate restano montate:
-        // prima venivano smontate a ogni scroll e l'intero player
-        // veniva ricaricato ogni volta che si muoveva la pagina.
-        function syncLive() {
-            if (sourceUp === false) return; // sorgente giù: l'avviso è già in pagina
-            if (sourceUp === null) { ensureSourceThen(syncLive); return; }
-
-            const fsTile = document.fullscreenElement;
-            const candidates = [];
-            visible.forEach((ratio, tile) => {
-                if (!tile.isConnected) return;
-                candidates.push([tile, ratio]);
-            });
-
-            candidates.sort((a, b) => {
-                if (b[1] !== a[1]) return b[1] - a[1];
-                return parseInt(a[0].dataset.n, 10) - parseInt(b[0].dataset.n, 10);
-            });
-
-            candidates.slice(0, MAX_LIVE).forEach(c => mount(c[0]));
-            if (fsTile && fsTile.classList.contains('mv-tile')) mount(fsTile);
-            updateStats();
-        }
-
-        // --- Ricerca ---------------------------------------------------
-        function createTile(n) {
+        function createGridTile(n) {
             const tile = document.createElement('div');
             tile.className = 'mv-tile fade-in';
+            if (discardedSet.has(n)) tile.classList.add('is-discarded');
             tile.dataset.n = n;
+
+            const isSaved = savedSet.has(n);
+            const isDiscarded = discardedSet.has(n);
+
             tile.innerHTML = `
+                <div class="mv-tile-curate">
+                    <button class="mv-tile-btn tile-keep ${isSaved ? 'is-active' : ''}" title="${isSaved ? 'Rimuovi dai tenuti' : 'Tieni nei preferiti'}" type="button">★</button>
+                    <button class="mv-tile-btn tile-discard ${isDiscarded ? 'is-active' : ''}" title="${isDiscarded ? 'Ripristina' : 'Elimina POV'}" type="button">🗑</button>
+                </div>
                 <div class="mv-ph">
                     <span class="mv-num">#${n}</span>
                     <span class="mv-live"><i></i>LIVE</span>
@@ -366,8 +611,48 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>`;
 
+            // Azione Tieni
+            tile.querySelector('.tile-keep').addEventListener('click', ev => {
+                ev.stopPropagation();
+                if (savedSet.has(n)) savedSet.delete(n);
+                else {
+                    savedSet.add(n);
+                    discardedSet.delete(n);
+                }
+                persist();
+                if (gridFilter === 'saved' || gridFilter === 'valid') {
+                    updateGridFilterList();
+                    renderGrid();
+                } else {
+                    tile.querySelector('.tile-keep').classList.toggle('is-active', savedSet.has(n));
+                    tile.querySelector('.tile-discard').classList.toggle('is-active', discardedSet.has(n));
+                    tile.classList.toggle('is-discarded', discardedSet.has(n));
+                }
+            });
+
+            // Azione Elimina
+            tile.querySelector('.tile-discard').addEventListener('click', ev => {
+                ev.stopPropagation();
+                if (discardedSet.has(n)) discardedSet.delete(n);
+                else {
+                    discardedSet.add(n);
+                    savedSet.delete(n);
+                }
+                persist();
+                if (gridFilter === 'valid' || gridFilter === 'discarded') {
+                    updateGridFilterList();
+                    renderGrid();
+                } else {
+                    tile.querySelector('.tile-keep').classList.toggle('is-active', savedSet.has(n));
+                    tile.querySelector('.tile-discard').classList.toggle('is-active', discardedSet.has(n));
+                    tile.classList.toggle('is-discarded', discardedSet.has(n));
+                }
+            });
+
+            // Overlay Fullscreen o apertura in Single Mode
             tile.querySelector('.mv-overlay').addEventListener('click', ev => {
                 ev.stopPropagation();
+                // Vai a schermo intero su questa tile
                 goFullscreen(tile);
             });
             tile.querySelector('.mv-exit').addEventListener('click', ev => {
@@ -382,33 +667,18 @@
             return tile;
         }
 
-        function render() {
-            const [start, end] = pageRange(page);
-            rangeEl.textContent = `${start} – ${end}`;
-
-            // ripulizia
-            if (observer) observer.disconnect();
+        function cleanGrid() {
+            if (gridObserver) gridObserver.disconnect();
             visible.clear();
-            liveTiles.forEach(t => t.classList.remove('loaded'));
-            liveTiles.clear();
-            grid.innerHTML = '';
-
-            const frag = document.createDocumentFragment();
-            for (let n = start; n <= end; n++) frag.appendChild(createTile(n));
-            grid.appendChild(frag);
-
-            observer = new IntersectionObserver(onIntersect, {
-                root: null,
-                rootMargin: '120px 0px',
-                threshold: [0, 0.25, 0.5, 0.75, 1]
+            mountQueue.length = 0;
+            gridEl.querySelectorAll('iframe').forEach(f => {
+                try { f.src = 'about:blank'; } catch (e) {}
+                f.remove();
             });
-            grid.querySelectorAll('.mv-tile').forEach(t => observer.observe(t));
-
-            buildPages();
-            updateStats();
+            liveTiles.clear();
         }
 
-        function onIntersect(entries) {
+        function onGridIntersect(entries) {
             entries.forEach(en => {
                 if (en.isIntersecting) {
                     visible.set(en.target, en.intersectionRatio || 0.01);
@@ -416,40 +686,342 @@
                     visible.delete(en.target);
                 }
             });
-            syncLive();
+            syncGridLive();
         }
 
-        function updateStats() {
-            const offline = grid.querySelectorAll('.mv-tile.failed').length;
-            statsEl.classList.toggle('mv-down', offline > 0);
-            statsEl.textContent = offline
-                ? `${liveTiles.size} / ${MAX_LIVE} live · ${offline} offline`
-                : `${liveTiles.size} / ${MAX_LIVE} live`;
-            syncAlert(offline);
+        function syncGridLive() {
+            if (currentMode !== 'grid') return;
+            const candidates = [];
+            visible.forEach((ratio, tile) => {
+                if (!tile.isConnected || tile.classList.contains('is-discarded')) return;
+                candidates.push([tile, ratio]);
+            });
+
+            candidates.sort((a, b) => b[1] - a[1]);
+            candidates.slice(0, MAX_LIVE).forEach(c => queueMount(c[0]));
+            updateStats();
         }
 
-        // Avviso in pagina quando la sorgente non risponde,
-        // con ripristino automatico finché non torna online.
-        function syncAlert(offline) {
-            if (!alertEl) return;
-            if (alertCount) alertCount.textContent = offline;
-            alertEl.hidden = offline === 0;
+        function queueMount(tile) {
+            if (tile.dataset.queued === '1' || tile.querySelector('iframe')) return;
+            tile.dataset.queued = '1';
+            mountQueue.push(tile);
+            pumpGridQueue();
+        }
 
-            if (offline > 0 && retryTimer === null) {
-                retryTimer = setInterval(retryFailed, RETRY_DELAY);
-            } else if (offline === 0 && retryTimer !== null) {
-                clearInterval(retryTimer);
-                retryTimer = null;
+        function pumpGridQueue() {
+            while (mountActive < MOUNT_CONCURRENCY && mountQueue.length) {
+                const tile = mountQueue.shift();
+                if (!tile.isConnected || tile.querySelector('iframe')) continue;
+                mountActive++;
+                mountGridFrame(tile);
+                setTimeout(() => {
+                    mountActive--;
+                    pumpGridQueue();
+                }, MOUNT_GAP);
             }
         }
 
-        // --- Fullscreen ----------------------------------------------
-        function hideHint() {
-            if (hintEl) hintEl.classList.add('mv-hint-fade');
+        function mountGridFrame(tile) {
+            const n = tile.dataset.n;
+            const frame = document.createElement('iframe');
+            frame.className = 'mv-frame';
+            frame.src = streamUrl(n);
+            frame.title = `Stream ${n}`;
+            frame.referrerPolicy = 'no-referrer';
+            frame.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
+            frame.setAttribute('allowfullscreen', '');
+            frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-fullscreen');
+
+            let revealed = false;
+            const reveal = () => {
+                if (revealed) return;
+                revealed = true;
+                tile.classList.add('loaded');
+                updateStats();
+            };
+            const timer = setTimeout(reveal, REVEAL_TIMEOUT);
+            frame.addEventListener('load', () => {
+                clearTimeout(timer);
+                reveal();
+            });
+
+            tile.appendChild(frame);
+            liveTiles.add(tile);
+            updateStats();
         }
 
+        function retryTile(tile) {
+            tile.classList.remove('failed');
+            tile.dataset.queued = '0';
+            queueMount(tile);
+        }
+
+        function buildGridPages(pageCount) {
+            pagesNav.innerHTML = '';
+            if (pageCount <= 1) return;
+
+            const prev = document.createElement('button');
+            prev.className = 'mv-page mv-arrow';
+            prev.type = 'button';
+            prev.innerHTML = '&lsaquo;';
+            prev.disabled = gridPage <= 1;
+            prev.addEventListener('click', () => {
+                gridPage--;
+                renderGrid();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            pagesNav.appendChild(prev);
+
+            const items = [1, pageCount];
+            for (let p = gridPage - 2; p <= gridPage + 2; p++) {
+                if (p >= 1 && p <= pageCount) items.push(p);
+            }
+            const unique = [...new Set(items)].sort((a,b)=>a-b);
+            let last = 0;
+            unique.forEach(p => {
+                if (p - last > 1) {
+                    const dots = document.createElement('span');
+                    dots.className = 'mv-page mv-dots';
+                    dots.textContent = '…';
+                    pagesNav.appendChild(dots);
+                }
+                const btn = document.createElement('button');
+                btn.className = 'mv-page' + (p === gridPage ? ' active' : '');
+                btn.type = 'button';
+                btn.textContent = p;
+                btn.addEventListener('click', () => {
+                    gridPage = p;
+                    renderGrid();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+                pagesNav.appendChild(btn);
+                last = p;
+            });
+
+            const next = document.createElement('button');
+            next.className = 'mv-page mv-arrow';
+            next.type = 'button';
+            next.innerHTML = '&rsaquo;';
+            next.disabled = gridPage >= pageCount;
+            next.addEventListener('click', () => {
+                gridPage++;
+                renderGrid();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            pagesNav.appendChild(next);
+        }
+
+        function updateStats() {
+            statsEl.textContent = `${liveTiles.size} / ${MAX_LIVE} live`;
+        }
+
+        // Filtri Griglia
+        document.querySelectorAll('#mv-grid-filters .mv-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#mv-grid-filters .mv-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                gridFilter = btn.dataset.filter;
+                gridPage = 1;
+                updateGridFilterList();
+                renderGrid();
+            });
+        });
+
+        // ============================================================
+        //  MODALE GESTIONE LISTE & BACKUP
+        // ============================================================
+        function openModal(tab = 'saved') {
+            activeModalTab = tab;
+            modalEl.style.display = 'flex';
+            document.querySelectorAll('.mv-modal-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            renderModalContent();
+        }
+
+        function closeModal() {
+            modalEl.style.display = 'none';
+        }
+
+        document.getElementById('btn-open-saved').addEventListener('click', () => openModal('saved'));
+        document.getElementById('btn-open-discarded').addEventListener('click', () => openModal('discarded'));
+        document.getElementById('btn-open-manage').addEventListener('click', () => openModal('saved'));
+        modalClose.addEventListener('click', closeModal);
+        modalEl.addEventListener('click', e => {
+            if (e.target === modalEl) closeModal();
+        });
+
+        document.querySelectorAll('.mv-modal-tab').forEach(t => {
+            t.addEventListener('click', () => {
+                document.querySelectorAll('.mv-modal-tab').forEach(b => b.classList.remove('active'));
+                t.classList.add('active');
+                activeModalTab = t.dataset.tab;
+                renderModalContent();
+            });
+        });
+
+        function renderModalContent() {
+            modalBody.innerHTML = '';
+            modalActions.innerHTML = '';
+
+            if (activeModalTab === 'saved') {
+                const list = [...savedSet].sort((a,b)=>a-b);
+                if (list.length === 0) {
+                    modalBody.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 2rem;">Nessun POV tenuto finora. Usa il tasto <b>★ Tieni</b> durante lo sfoglio per salvare i canali funzionanti!</p>';
+                } else {
+                    const desc = document.createElement('p');
+                    desc.style.fontSize = '0.85rem';
+                    desc.style.color = '#9ca3af';
+                    desc.innerHTML = `Hai salvato <b>${list.length}</b> POV. Clicca su un numero per visualizzarlo subito:`;
+                    modalBody.appendChild(desc);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'mv-chips-grid';
+                    list.forEach(n => {
+                        const chip = document.createElement('span');
+                        chip.className = 'mv-chip chip-saved';
+                        chip.innerHTML = `<span>#${n}</span><button class="mv-chip-del" title="Rimuovi">&times;</button>`;
+                        chip.querySelector('span').addEventListener('click', () => {
+                            closeModal();
+                            setMode('single');
+                            loadSingleStream(n);
+                        });
+                        chip.querySelector('.mv-chip-del').addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            savedSet.delete(n);
+                            persist();
+                            renderModalContent();
+                            if (currentMode === 'single' && currentN === n) updateSingleStatusBadge(n);
+                            else if (currentMode === 'grid') { updateGridFilterList(); renderGrid(); }
+                        });
+                        grid.appendChild(chip);
+                    });
+                    modalBody.appendChild(grid);
+
+                    // Azioni
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'mv-m-btn';
+                    copyBtn.innerHTML = '📋 Copia elenco numeri';
+                    copyBtn.onclick = () => {
+                        navigator.clipboard.writeText(list.join(', ')).then(() => {
+                            copyBtn.textContent = '✓ Copiato!';
+                            setTimeout(() => copyBtn.innerHTML = '📋 Copia elenco numeri', 1500);
+                        });
+                    };
+                    modalActions.appendChild(copyBtn);
+
+                    const viewGridBtn = document.createElement('button');
+                    viewGridBtn.className = 'mv-m-btn';
+                    viewGridBtn.textContent = '▦ Guarda in Griglia';
+                    viewGridBtn.onclick = () => {
+                        closeModal();
+                        setMode('grid');
+                        document.querySelector('#mv-grid-filters [data-filter="saved"]').click();
+                    };
+                    modalActions.appendChild(viewGridBtn);
+                }
+            } else if (activeModalTab === 'discarded') {
+                const list = [...discardedSet].sort((a,b)=>a-b);
+                if (list.length === 0) {
+                    modalBody.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 2rem;">Nessun POV eliminato. Quando scarti un canale non funzionante con <b>🗑 Scarta</b> comparirà qui.</p>';
+                } else {
+                    const desc = document.createElement('p');
+                    desc.style.fontSize = '0.85rem';
+                    desc.style.color = '#9ca3af';
+                    desc.innerHTML = `Hai eliminato <b>${list.length}</b> POV. Clicca la <b>&times;</b> su un chip per ripristinarlo:`;
+                    modalBody.appendChild(desc);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'mv-chips-grid';
+                    list.forEach(n => {
+                        const chip = document.createElement('span');
+                        chip.className = 'mv-chip chip-discarded';
+                        chip.innerHTML = `<span>#${n}</span><button class="mv-chip-del" title="Ripristina">&times;</button>`;
+                        chip.querySelector('span').addEventListener('click', () => {
+                            closeModal();
+                            setMode('single');
+                            loadSingleStream(n);
+                        });
+                        chip.querySelector('.mv-chip-del').addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            discardedSet.delete(n);
+                            persist();
+                            renderModalContent();
+                            if (currentMode === 'single' && currentN === n) updateSingleStatusBadge(n);
+                            else if (currentMode === 'grid') { updateGridFilterList(); renderGrid(); }
+                        });
+                        grid.appendChild(chip);
+                    });
+                    modalBody.appendChild(grid);
+
+                    // Azioni
+                    const restoreAllBtn = document.createElement('button');
+                    restoreAllBtn.className = 'mv-m-btn mv-m-btn-danger';
+                    restoreAllBtn.textContent = 'Ripristina tutti gli eliminati';
+                    restoreAllBtn.onclick = () => {
+                        if (confirm('Vuoi davvero ripristinare tutti i canali scartati?')) {
+                            discardedSet.clear();
+                            persist();
+                            renderModalContent();
+                            if (currentMode === 'single') updateSingleStatusBadge(currentN);
+                            else if (currentMode === 'grid') { updateGridFilterList(); renderGrid(); }
+                        }
+                    };
+                    modalActions.appendChild(restoreAllBtn);
+                }
+            } else if (activeModalTab === 'backup') {
+                modalBody.innerHTML = `
+                    <p style="font-size: 0.85rem; color: #9ca3af;">Puoi esportare la lista dei tuoi POV tenuti ed eliminati per salvarla o importarla su un altro dispositivo:</p>
+                    <textarea id="backup-json" style="width: 100%; height: 140px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); border-radius: 8px; color: #e5e7eb; font-family: monospace; font-size: 0.78rem; padding: 0.6rem;"></textarea>
+                    <div id="backup-msg" style="font-size: 0.8rem; min-height: 1.2rem;"></div>`;
+
+                const ta = modalBody.querySelector('#backup-json');
+                const data = {
+                    saved: [...savedSet].sort((a,b)=>a-b),
+                    discarded: [...discardedSet].sort((a,b)=>a-b)
+                };
+                ta.value = JSON.stringify(data, null, 2);
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'mv-m-btn';
+                copyBtn.textContent = '📋 Copia JSON';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(ta.value).then(() => {
+                        copyBtn.textContent = '✓ Copiato!';
+                        setTimeout(() => copyBtn.textContent = '📋 Copia JSON', 1500);
+                    });
+                };
+                modalActions.appendChild(copyBtn);
+
+                const importBtn = document.createElement('button');
+                importBtn.className = 'mv-m-btn';
+                importBtn.textContent = '📥 Importa da testo';
+                importBtn.onclick = () => {
+                    try {
+                        const parsed = JSON.parse(ta.value);
+                        if (Array.isArray(parsed.saved)) {
+                            savedSet = new Set(parsed.saved.map(Number));
+                        }
+                        if (Array.isArray(parsed.discarded)) {
+                            discardedSet = new Set(parsed.discarded.map(Number));
+                        }
+                        persist();
+                        document.getElementById('backup-msg').innerHTML = '<span style="color:#34d399">✓ Liste importate con successo!</span>';
+                        if (currentMode === 'single') updateSingleStatusBadge(currentN);
+                        else if (currentMode === 'grid') { updateGridFilterList(); renderGrid(); }
+                    } catch (err) {
+                        document.getElementById('backup-msg').innerHTML = '<span style="color:#ef4444">Errore: formato JSON non valido.</span>';
+                    }
+                };
+                modalActions.appendChild(importBtn);
+            }
+        }
+
+        // ============================================================
+        //  FULLSCREEN GRID
+        // ============================================================
         function goFullscreen(tile) {
-            hideHint();
             const req = tile.requestFullscreen || tile.webkitRequestFullscreen;
             if (req) {
                 try {
@@ -458,7 +1030,6 @@
                     return;
                 } catch (e) {
                     fallbackFullscreen(tile);
-                    return;
                 }
             }
             fallbackFullscreen(tile);
@@ -484,30 +1055,72 @@
                 document.querySelectorAll('.mv-tile.fs-fixed').forEach(t => t.classList.remove('fs-fixed'));
                 document.body.style.overflow = '';
             }
-            syncLive();
-        });
-        document.addEventListener('webkitfullscreenchange', () => {
-            if (!document.webkitFullscreenElement) {
-                document.querySelectorAll('.mv-tile.fs-fixed').forEach(t => t.classList.remove('fs-fixed'));
-                document.body.style.overflow = '';
-            }
-            syncLive();
+            if (currentMode === 'grid') syncGridLive();
         });
 
-        // Tastiera: Esc per uscire da tutto schermo
+        // ============================================================
+        //  SCORCIATOIE DA TASTIERA
+        // ============================================================
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') exitFullscreen();
+            // Ignora se si sta digitando in un input o textarea
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            if (e.key === 'Escape') {
+                if (modalEl.style.display === 'flex') {
+                    closeModal();
+                    return;
+                }
+                exitFullscreen();
+                return;
+            }
+
+            if (currentMode === 'single') {
+                if (e.key === 's' || e.key === 'S' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    actionKeep();
+                } else if (e.key === 'd' || e.key === 'D' || e.key === 'Delete' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    actionDiscard();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const prev = getNextN(currentN, -1);
+                    if (prev !== currentN) loadSingleStream(prev);
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    actionSkip();
+                } else if (e.key === 'f' || e.key === 'F') {
+                    e.preventDefault();
+                    toggleSingleFs();
+                }
+            }
         });
 
-        // --- Init -----------------------------------------------------
-        readParams();
-        writeParams();
-        render();
+        // ============================================================
+        //  INIZIALIZZAZIONE
+        // ============================================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramS = parseInt(urlParams.get('s'), 10);
+        const paramP = parseInt(urlParams.get('p'), 10);
+        const storedLastN = parseInt(localStorage.getItem(KEY_LAST_N), 10);
 
-        if (alertRetry) alertRetry.addEventListener('click', retryFailed);
+        if (paramS && paramS >= 1 && paramS <= TOTAL) {
+            currentN = paramS;
+            currentMode = 'single';
+        } else if (storedLastN && storedLastN >= 1 && storedLastN <= TOTAL) {
+            currentN = storedLastN;
+        }
 
-        // nasconde il suggerimento se non viene usato
-        setTimeout(hideHint, 20000);
+        if (paramP) {
+            gridPage = Math.max(1, paramP);
+            currentMode = 'grid';
+        }
+
+        updateCounters();
+        setMode(currentMode);
+
+        // Nascondi suggerimento dopo un po'
+        const hintEl = document.getElementById('mv-hint');
+        setTimeout(() => { if (hintEl) hintEl.classList.add('mv-hint-fade'); }, 14000);
     </script>
 </body>
 </html>
